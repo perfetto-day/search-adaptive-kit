@@ -1,4 +1,4 @@
-// Search Adaptive Chrome v0.5 — single optional module, no upstream Design.swift edits.
+// Search Adaptive Chrome v0.6 — single optional module, no upstream Design.swift edits.
 // All color and modal-overlay information stays on the Mac.
 import AppKit
 import Combine
@@ -15,7 +15,8 @@ struct AdaptiveChromeReport: Equatable {
 
 @MainActor
 enum AdaptiveChrome {
-    static let installed = true // Prevent the built-in updater replacing our app.
+    static let installed = true // Never install a stock Search binary over our app.
+    static let kitVersion = "v0.6"
     static let colorTransition: Animation = .easeInOut(duration: 0.24)
     static let settingsKey = "adaptive.chrome.enabled"
     // Notifications about official Search releases are on by default. Never
@@ -24,8 +25,10 @@ enum AdaptiveChrome {
     static var updateChecksEnabled: Bool {
         Store.settings.object(forKey: updateChecksKey) as? Bool ?? true
     }
-    static var debug: Bool { Store.settings.bool(forKey: "adaptive.chrome.debug") }
-    static var enabled: Bool { Store.settings.bool(forKey: settingsKey) }
+    static var debug: Bool { AdaptivePreferences.shared.debug }
+    static var enabled: Bool { AdaptivePreferences.shared.enabled }
+    static var searchTint: Bool { AdaptivePreferences.shared.searchTint }
+    static var roundedTop: Bool { AdaptivePreferences.shared.roundedTop }
 
     nonisolated static func parse(_ hex: String) -> NSColor? {
         guard hex.count == 7, hex.first == "#",
@@ -142,10 +145,15 @@ struct AdaptiveChromePalette {
         ink = Color(nsColor: inkNS).opacity(dark ? 0.92 : 0.87)
         muted = Color(nsColor: inkNS).opacity(dark ? 0.62 : 0.58)
         hairline = AdaptiveChrome.tone(base, lightness: dark ? 0.11 : -0.105, saturation: 0.9)
+        // On light pages, a gentle neutral shadow leaves the input visibly white.
         // Omnibox should shade in the SAME direction as the visible page, not
         // follow a user-selected browser appearance unrelated to the website.
-        searchScrim = dark ? Color.black.opacity(0.60) : Color.white.opacity(0.61)
-        searchField = AdaptiveChrome.tone(base, lightness: dark ? 0.105 : -0.065, saturation: 0.68)
+        searchScrim = dark ? Color.black.opacity(0.60) : Color.black.opacity(0.12)
+        // In a light theme the page is already lightened by the search scrim.
+        // The input must remain a brighter *surface* (not a grey tone of it).
+        searchField = dark
+            ? AdaptiveChrome.tone(base, lightness: 0.105, saturation: 0.68)
+            : AdaptiveChrome.mix(base, .white, amount: 0.96)
     }
 
     var greys: Greys { Greys(wash: active, hover: hover, tile: tile, pinLive: pin) }
@@ -243,6 +251,7 @@ struct AdaptiveChromeSurface: View {
     @ObservedObject var browser: Browser
     let fallback: Color
     @ObservedObject private var live: AdaptiveChromeLive
+    @ObservedObject private var options = AdaptivePreferences.shared
 
     init(browser: Browser, fallback: Color) {
         self.browser = browser
@@ -266,14 +275,17 @@ struct AdaptiveChromeStyle: ViewModifier {
     @ObservedObject var browser: Browser
     let greys: Greys
     let diagnostic: Bool
-    init(browser: Browser, greys: Greys, diagnostic: Bool = false) {
+    let shadeSearch: Bool
+    init(browser: Browser, greys: Greys, diagnostic: Bool = false, shadeSearch: Bool = true) {
         self.browser = browser
         self.greys = greys
         self.diagnostic = diagnostic
+        self.shadeSearch = shadeSearch
         _live = ObservedObject(wrappedValue: AdaptiveChromeLive.shared(for: browser))
     }
     @Environment(\.colorScheme) private var inheritedScheme
     @ObservedObject private var live: AdaptiveChromeLive
+    @ObservedObject private var options = AdaptivePreferences.shared
 
     func body(content: Content) -> some View {
         content
@@ -289,7 +301,7 @@ struct AdaptiveChromeStyle: ViewModifier {
                 // Search already shades the WebView; match that exact tint on
                 // the native chrome too. Keep the overlay mounted for a fade.
                 (live.palette?.searchScrim ?? (inheritedScheme == .dark ? Color.black.opacity(0.60) : Color.white.opacity(0.60)))
-                    .opacity(live.palette != nil && browser.fieldShowing ? 1 : 0)
+                    .opacity(shadeSearch && options.enabled && options.enabled && options.searchTint && browser.fieldShowing ? 1 : 0)
                     .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
                     .allowsHitTesting(false)
             }
@@ -310,6 +322,45 @@ struct AdaptiveChromeStyle: ViewModifier {
     }
 }
 
+
+// A faint, top-only outline makes the native rounding visible even when the
+// WebKit page has exactly the same background color as the adjacent toolbar.
+struct AdaptiveChromeTopEdge: Shape {
+    func path(in rect: CGRect) -> Path {
+        let radius: CGFloat = min(10, rect.width / 3)
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: radius))
+        path.addArc(tangent1: CGPoint(x: 0, y: 0), tangent2: CGPoint(x: radius, y: 0), radius: radius)
+        path.addLine(to: CGPoint(x: max(radius, rect.maxX - radius), y: 0))
+        path.addArc(tangent1: CGPoint(x: rect.maxX, y: 0), tangent2: CGPoint(x: rect.maxX, y: radius), radius: radius)
+        return path
+    }
+}
+
+// Covers the *entire* top strip after Search has composed its tabs, icons and
+// buttons, but before the omnibox is presented. Unlike a TabBar background it
+// therefore shades tab glyphs and hover states as well as the strip itself.
+@MainActor
+struct AdaptiveChromeTopShade: View {
+    @ObservedObject var browser: Browser
+    @ObservedObject private var live: AdaptiveChromeLive
+    @ObservedObject private var options = AdaptivePreferences.shared
+    @Environment(\.colorScheme) private var scheme
+
+    init(browser: Browser) {
+        self.browser = browser
+        _live = ObservedObject(wrappedValue: AdaptiveChromeLive.shared(for: browser))
+    }
+    var body: some View {
+        (live.palette?.searchScrim ?? (scheme == .dark ? Color.black.opacity(0.60) : Color.white.opacity(0.60)))
+            .opacity(options.enabled && options.searchTint && browser.fieldShowing ? 1 : 0)
+            .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
+            .allowsHitTesting(false)
+            .onAppear { live.follow(browser.active, browser: browser) }
+            .onChange(of: browser.activeID) { _, _ in live.follow(browser.active, browser: browser) }
+    }
+}
+
 // The omnibox shares the active page palette, without shading the entire
 // overlay view. It must be mounted even when the page has no color yet.
 @MainActor
@@ -317,6 +368,7 @@ struct AdaptiveChromeSearchContext: ViewModifier {
     @ObservedObject var browser: Browser
     @Environment(\.colorScheme) private var inheritedScheme
     @ObservedObject private var live: AdaptiveChromeLive
+    @ObservedObject private var options = AdaptivePreferences.shared
 
     init(browser: Browser) {
         self.browser = browser

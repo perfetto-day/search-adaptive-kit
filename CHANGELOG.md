@@ -1,37 +1,36 @@
-# Search Adaptive Kit Changelog
+# Search Adaptive Kit — Changelog
 
-## v0.5 — shared search palette, update notifications, rounded page edge
+## v0.6 — Settings and staged GitHub updates
 
-- One per-browser live color model for toolbar, sidebar and Omnibox; no independent palette race on new tabs.
-- Omnibox uses the shared palette directly to avoid a light neutral search field over a dark site.
-- Edge-to-edge web pages below horizontal tabs have **top-only rounded corners** using native `StageView.layer.maskedCorners` (no extra clipping on the whole SwiftUI window).
-- Restore background checks for official Search releases **ON by default**; report new versions through Search's in-app announcements.
-- Block all official binary replacement paths in the modified app; rebuild with the kit to actually update.
-- Add `updates-on` / `updates-off` in `toggle-mode.command` (manual update checking still possible).
-- Add a seventh upstream integration file (`Stage.swift`) and regression test assertions.
+- Fix light-page search field: light input is distinctly brighter than the dimmed page; dark inputs keep their hue.
+- Dim the full horizontal toolbar including icons, tabs and buttons at the top-level window overlay, just under the omnibox.
+- Expose five preferences in `search://settings/appearance`: adaptive colors, search overlay, rounded corners, diagnostics, and official release checks.
+- Give top-only page corners a small gutter and faint edge, so the rounding is visible even when chrome and page match.
+- Add opt-in GitHub update panel with branch/tag and exact SHA selection, two-step local build/staged install/restart, and a local build log. Nothing runs from GitHub without confirmation.
+- Keep official Search release notifications enabled by default, blocking installation of unmodified official binaries over the patched app.
+- Add mod update script and a managed checkout; never reset user-owned directories.
+- Expand patch to `Settings.swift` and copy a second isolated module, `AdaptiveSettings.swift`.
 
-## v0.4 — Search overlay and modal color matching
+## v0.5 — Shared palette, page geometry, safe official update notices
 
-- Preserve the last valid page palette while showing the omnibox/new-tab field; avoid reverting to a white field over a dark page.
-- Keep the search scrim on the native toolbar and the WebView in sync, including when the address bar is opened for a new tab.
-- Use the actual CSS modal-backdrop RGB shade rather than assuming every backdrop is black. Supports light overlays too.
-- Refresh the shared browser-color cache when the search field opens/closes; keep stale modal dimming out of the cache.
-- Extend detector tests to cover RGB-colored modal overlays and light overlay shades.
+- Single per-window observer shared by tabs, toolbar and omnibox.
+- Experimental top-only corner rounding of edge-to-edge WebViews.
+- Check for official Search releases by default, without overwriting the modified browser.
+- Optional CLI flags to disable release notifications.
+
+## v0.4 — New-tab and modal tint
+
+- Preserve the active site's last reliable background during new-tab creation.
+- Detect RGB tint and alpha of modal overlays instead of assuming every backdrop is black.
 
 ## v0.3 — Search and smooth chrome
 
-- Smooth 240 ms color transitions when a site's theme/background changes.
-- Shared tint and fade between the omnibox scrim and native chrome, including horizontal/vertical tabs.
-- Search input, text, suggestions, and field backdrop follow active site's contrast and hue.
-- HSL lightness adjustments instead of neutral black/white mixing for active/hover/pinned tabs.
-- Bounded on-screen pixel verification of the visible top-of-page color after changes.
-- Hold the previous page color briefly while a navigation commits.
-- Update script still applies the patch to fresh upstream Search; no upstream fork required.
+- 240 ms color transitions, search tint, hue-preserving HSL accent colors and bounded pixel snapshot fallback.
 
-## v0.2
+## v0.2 — Colors and stability
 
-- Top-edge detection, modal dimming, shared UI palette, stable top toolbar, safe updater handling, debug marker.
+- Dominant top-edge color detector, hover/pinned tab palette, modal shading and stable tab strip.
 
 ## v0.1
 
-- Initial adaptive chrome prototype for Search.
+- Initial adaptive chrome prototype.

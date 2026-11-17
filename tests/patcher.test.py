@@ -26,7 +26,10 @@ SOURCES = {
 ''',
 'App.swift': '''let tint = (fullscreenTab != nil ? Color.black : cards ? Palette.frame : Palette.ground)
             Omnibox(browser: browser, over: !(browser.active?.isBlank ?? true))
-            Page(tab: tab, corner: cards ? Metrics.cardRadius : 0, browser: browser)''',
+            Page(tab: tab, corner: cards ? Metrics.cardRadius : 0, browser: browser)
+            stage
+                .modifier(CardEdge(on: cards && !browser.prefs.splitView))
+            .overlay { field }''',
 'Side.swift': '''struct SideBar: View {
         .environment(\\.greys, greys)
         .frame(width: width)
@@ -136,6 +139,16 @@ struct AddressField: NSViewRepresentable {
     private func take(_ release: Release) {
     }
 ''',
+ 'Settings.swift': '''    @ViewBuilder
+    private func section(_ page: Page) -> some View {
+        switch page {
+        case .keyboard:
+            groups(of: page)
+        default:
+            groups(of: page)
+        }
+    }
+''',
 'Stage.swift': '''struct Page: View {
     var corner: CGFloat = 0
     /// The window, for a tab showing one of Search's own pages
@@ -186,7 +199,10 @@ def check():
         assert 'AdaptiveChromeSearchContext' in first['App.swift'].decode()
         assert 'AdaptiveChromePalette' in first['AdaptiveChrome.swift'].decode()
         assert 'shade: AdaptiveChrome.parse(shade)' in first['Tab.swift'].decode()
-        assert 'Search Adaptive v0.5' in first['Tab.swift'].decode()
+        assert 'Search Adaptive v0.6' in first['Tab.swift'].decode()
+        assert 'AdaptiveSettingsPanel(browser: browser)' in first['Settings.swift'].decode()
+        assert 'AdaptiveChromeTopShade' in first['App.swift'].decode()
+        assert 'AdaptiveSettings' in first['AdaptiveSettings.swift'].decode()
         assert 'topCornersOnly' in first['Stage.swift'].decode()
         assert 'layerMinXMaxYCorner' in first['Stage.swift'].decode()
         assert 'updateChecksEnabled' in first['Updater.swift'].decode()

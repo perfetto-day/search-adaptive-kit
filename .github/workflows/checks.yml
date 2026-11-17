@@ -26,13 +26,13 @@ jobs:
       - name: JavaScript color detector tests
         run: node tests/color-detector.test.js
       - name: Check shell syntax
-        run: bash -n update-and-build.sh toggle-mode.command
+        run: bash -n update-and-build.sh toggle-mode.command mod-update.command
       - name: Check Python syntax
         run: python3 -m py_compile apply_mod.py tests/patcher.test.py
 
   macos-build:
     name: macOS / Xcode native build
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4

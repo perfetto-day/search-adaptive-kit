@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Search Adaptive v0.5 overlay. Validates all anchors before touching files.
+"""Search Adaptive v0.6 overlay. Validates all anchors before touching files.
 
 Works against a clean upstream checkout; safe to run twice on the same checkout.
 The update script always restores upstream main first so a new release is never
@@ -20,7 +20,7 @@ def one(code: str, before: str, after: str, file: Path) -> str:
 
 def apply(repo: Path, kit: Path) -> None:
     root = repo / 'Sources' / 'Search'
-    paths = {n: root / n for n in ['Tab.swift', 'App.swift', 'Side.swift', 'TabBar.swift', 'Omnibox.swift', 'Updater.swift', 'Stage.swift']}
+    paths = {n: root / n for n in ['Tab.swift', 'App.swift', 'Side.swift', 'TabBar.swift', 'Omnibox.swift', 'Updater.swift', 'Stage.swift', 'Settings.swift']}
     for file in paths.values():
         if not file.is_file():
             raise RuntimeError(f"Not a Search source tree: missing {file}")
@@ -32,7 +32,7 @@ def apply(repo: Path, kit: Path) -> None:
             '    @Published private(set) var cover: NSImage?',
             '''    @Published private(set) var cover: NSImage?
 
-    // Search Adaptive v0.5. Only the active Tab's report is drawn in the chrome.
+    // Search Adaptive v0.6. Only the active Tab's report is drawn in the chrome.
     @Published private(set) var adaptiveChromeReport = AdaptiveChromeReport()
     private let adaptiveChromeRelay = AdaptiveChromeRelay()
     private var adaptiveChromeGeneration = 0
@@ -133,13 +133,39 @@ def apply(repo: Path, kit: Path) -> None:
             '            Omnibox(browser: browser, over: !(browser.active?.isBlank ?? true))',
             """            Omnibox(browser: browser, over: !(browser.active?.isBlank ?? true))
                 .modifier(AdaptiveChromeSearchContext(browser: browser))""", app)
+        # Window-level top strip shade is composited above tabs/buttons but
+        # before the search field. A TabBar-only overlay missed native chrome.
+        s = one(s,
+            '            .overlay { field }',
+            """            .overlay(alignment: .top) {
+                if !browser.prefs.sidebar && fullscreenTab == nil {
+                    AdaptiveChromeTopShade(browser: browser)
+                        .frame(height: chrome.height)
+                        .ignoresSafeArea()
+                }
+            }
+            .overlay { field }""", app)
+        s = one(s,
+            """            stage
+                .modifier(CardEdge(on: cards && !browser.prefs.splitView))""",
+            """            stage
+                .modifier(CardEdge(on: cards && !browser.prefs.splitView))
+                .overlay(alignment: .top) {
+                    if AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && fullscreenTab == nil {
+                        AdaptiveChromeTopEdge()
+                            .stroke(Color.primary.opacity(0.14), lineWidth: 1)
+                            .frame(height: 12)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .padding(.top, AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && fullscreenTab == nil ? 5 : 0)""", app)
         changes['App.swift'] = s
-    if 'topCornersOnly: !cards && !browser.prefs.sidebar' not in s:
+    if 'topCornersOnly: AdaptiveChrome.roundedTop' not in s:
         s = one(s,
             'Page(tab: tab, corner: cards ? Metrics.cardRadius : 0, browser: browser)',
             '''Page(tab: tab,
-                 corner: cards || (!browser.prefs.sidebar && fullscreenTab == nil) ? Metrics.cardRadius : 0,
-                 topCornersOnly: !cards && !browser.prefs.sidebar && fullscreenTab == nil,
+                 corner: cards || (AdaptiveChrome.roundedTop && !browser.prefs.sidebar && fullscreenTab == nil) ? Metrics.cardRadius : 0,
+                 topCornersOnly: AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && fullscreenTab == nil,
                  browser: browser)''', app)
         changes['App.swift'] = s
 
@@ -248,7 +274,7 @@ def apply(repo: Path, kit: Path) -> None:
         // Individual tab pills retain their own animations.
         .animation(nil, value: browser.tabs.map(\\.id))
         .background(AdaptiveChromeSurface(browser: browser, fallback: Palette.ground))
-        .modifier(AdaptiveChromeStyle(browser: browser, greys: .white, diagnostic: true))
+        .modifier(AdaptiveChromeStyle(browser: browser, greys: .white, diagnostic: true, shadeSearch: false))
     }
 
     // MARK: - the spaces, one above the other''', bar)
@@ -344,6 +370,20 @@ struct Omnibox: View {
         s = front + divider + tail
         changes['Omnibox.swift'] = s
 
+    settings = paths['Settings.swift']; s = changes['Settings.swift']
+    if 'AdaptiveSettingsPanel(browser: browser)' not in s:
+        s = one(s,
+            '''        case .keyboard:
+            groups(of: page)''',
+            '''        case .appearance:
+            groups(of: page)
+            GroupBlock(title: "Search Adaptive", icon: "paintbrush.pointed") {
+                AdaptiveSettingsPanel(browser: browser)
+            }
+        case .keyboard:
+            groups(of: page)''', settings)
+        changes['Settings.swift'] = s
+
     # Keep upstream release checks on by default; block binary replacement.
     updater = paths['Updater.swift']; s = changes['Updater.swift']
     if 'AdaptiveChrome.updateChecksEnabled' not in s:
@@ -382,16 +422,18 @@ struct Omnibox: View {
             '    private func take(_ release: Release) {\n        if AdaptiveChrome.installed { return }', updater)
         changes['Updater.swift'] = s
 
-    shipped = kit / 'AdaptiveChrome.swift'
-    if not shipped.is_file():
-        raise RuntimeError(f"Missing {shipped}")
+    modules = ['AdaptiveChrome.swift', 'AdaptiveSettings.swift']
+    for module in modules:
+        if not (kit / module).is_file():
+            raise RuntimeError(f"Missing {kit / module}")
     # All anchors passed, now write changes atomically per file.
     for name, content in changes.items():
         path = paths[name]
         if path.read_text(encoding='utf8') != content:
             path.write_text(content, encoding='utf8')
-    shutil.copy2(shipped, root / 'AdaptiveChrome.swift')
-    print('Applied Search Adaptive Chrome v0.5 (7 integration files + module).')
+    for module in modules:
+        shutil.copy2(kit / module, root / module)
+    print('Applied Search Adaptive Chrome v0.6 (8 integration files + 2 modules).')
     print('Enable before launch: defaults write com.officecommun.search adaptive.chrome.enabled -bool true')
 
 

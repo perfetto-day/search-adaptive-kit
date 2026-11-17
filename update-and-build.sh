@@ -1,7 +1,9 @@
 #!/bin/bash
-# Search Adaptive v0.5: update only the dedicated checkout, patch, build, install.
+# Search Adaptive v0.6: update only the dedicated checkout, patch, build, install.
 set -euo pipefail
 KIT="$(cd "$(dirname "$0")" && pwd)"
+MODE="${1:-install}"
+if [[ "$MODE" != "install" && "$MODE" != "--stage" ]]; then echo "Usage: $0 [--stage]" >&2; exit 2; fi
 ROOT="$HOME/Library/Application Support/SearchAdaptive"
 SOURCE="$ROOT/Search-source"
 mkdir -p "$ROOT"
@@ -52,11 +54,19 @@ git checkout -B adaptive-chrome origin/main
 git reset --hard origin/main
 python3 "$KIT/apply_mod.py" "$SOURCE"
 
-echo "Compiling Search Adaptive v0.5 (log: $ROOT/last-build.log)"
+echo "Compiling Search Adaptive v0.6 (log: $ROOT/last-build.log)"
 if ! ./build.sh release app 2>&1 | tee "$ROOT/last-build.log"; then
   echo "Build failed. Last log: $ROOT/last-build.log" >&2
   echo "Look for the FIRST compiler error, not follow-up messages." >&2
   exit 1
+fi
+
+if [[ "$MODE" == "--stage" ]]; then
+  PENDING="$ROOT/Pending.app"
+  if [[ -e "$PENDING" ]]; then rm -rf "$PENDING"; fi
+  cp -R build/Search.app "$PENDING"
+  echo "Staged new Search Adaptive build: $PENDING"
+  exit 0
 fi
 
 DEST="$HOME/Applications/Search Adaptive.app"
@@ -82,6 +92,11 @@ else
   if [[ -e "$BACKUP" ]]; then mv "$BACKUP" "$DEST"; fi
   exit 1
 fi
+# Make a trusted copy of the updater helper available to the running app.
+mkdir -p "$ROOT/Tools"
+cp "$KIT/mod-update.command" "$ROOT/Tools/mod-update.command"
+chmod +x "$ROOT/Tools/mod-update.command"
+if [[ -d "$KIT/.git" ]]; then git -C "$KIT" rev-parse HEAD > "$ROOT/installed-mod.txt"; fi
 printf '\nInstalled: %s\n' "$DEST"
 echo "Search Adaptive checks for official Search releases by default, but never replaces its patched binary."
 echo "Disable official release checks: $KIT/toggle-mode.command updates-off"

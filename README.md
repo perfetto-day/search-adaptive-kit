@@ -32,10 +32,10 @@ This is **not** a Chrome / Safari extension. Search's interface is written in Sw
 | **Adaptive toolbar** | Estimates the top-of-page background, prioritizing visible colors over page accent metadata |
 | **Tinted tabs** | Uses hue-preserving HSL lightness adjustments for active, hovered and pinned tabs |
 | **Smooth transitions** | Animates compatible color changes (~240 ms), without animating toolbar position |
-| **Unified search overlay** | Keeps the last reliable page color while the new-tab field appears; matches search scrim, native chrome and input |
+| **Unified search overlay** | Keeps the last reliable page color; dims tabs/icons together and leaves a brighter input on light pages |
 | **Modal awareness** | Mirrors the actual RGB tint and alpha of common CSS modal backdrops |
 | **Pixel validation** | Uses limited, occasional WebKit snapshots when CSS sampling is ambiguous |
-| **Rounded page top** | Clips the top corners of edge-to-edge WebViews under the horizontal tab strip with AppKit |\n| **Release notifications** | Checks official Search releases by default without silently replacing the modified build |\n| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
+| **Rounded page top** | Native AppKit corner clipping with a slight gutter and outline (optional) |\n| **Release notifications** | Optional official release checks (ON by default), never overwriting the patched app |\n| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
 
 The color detector is heuristic. Complex canvases, videos, gradients, custom overlays, translucent content and split-screen layouts may not match perfectly.
 
@@ -72,6 +72,12 @@ git pull --ff-only
 
 Official Search release **checks and in-app announcements are enabled by default**. The modified app will **not install** official Search binaries automatically because they would erase the adaptive modifications. Rebuild with `./update-and-build.sh` when a release is announced. You can turn background checks off; manual checks remain available.
 
+### In-browser settings & mod updates
+
+Go to `search://settings/appearance` → **Search Adaptive** to change adaptive coloring, search-overlay tint, top page rounding, diagnostics, and official release checks. These are the same preferences as `toggle-mode.command`. Reload already-open pages after enabling color detection.
+
+For **optional GitHub-based mod updates**, click **Check GitHub branches and tags**, select a branch or tag and review its exact commit SHA, then choose **Download & Build**. The build runs locally in a dedicated managed checkout and is **never automatically installed**. After a successful build, confirm **Install & Restart**. A failed build leaves the currently installed app untouched. Selecting a remote revision and building it executes that revision's code on your Mac; only use trusted commits.
+
 ### Controls
 
 ```bash
@@ -79,6 +85,10 @@ Official Search release **checks and in-app announcements are enabled by default
 ./toggle-mode.command off         # original Search palette
 ./toggle-mode.command debug-on    # show detected color / source / dimming
 ./toggle-mode.command debug-off
+./toggle-mode.command search-on     # page-aware search overlay (default)
+./toggle-mode.command search-off
+./toggle-mode.command round-on      # top page corners (default)
+./toggle-mode.command round-off
 ./toggle-mode.command updates-on    # check for official Search releases (default)
 ./toggle-mode.command updates-off   # disable background checks
 ./toggle-mode.command status
@@ -93,26 +103,28 @@ AdaptiveChrome.swift           WebKit color sampling, palette and SwiftUI integr
 apply_mod.py                   Guarded, repeatable upstream patcher
 update-and-build.sh            Clone upstream, apply, build, install
 toggle-mode.command            Local preference switches
+AdaptiveSettings.swift          Appearance settings, GitHub reference browser and build UI
+mod-update.command              Pinned-SHA stage/build/install helper
 tests/                         Detector and patcher regression tests
 README_RU.md                   Full Russian installation / troubleshooting guide
 CHANGELOG.md                   Changes between prototypes
 ```
 
-The patcher modifies **seven** upstream Swift sources: `Tab.swift`, `App.swift`, `Side.swift`, `TabBar.swift`, `Omnibox.swift`, `Updater.swift` and `Stage.swift`. It stops rather than guessing when an upstream code anchor changes.
+The patcher modifies **eight** upstream Swift sources: `Tab.swift`, `App.swift`, `Side.swift`, `TabBar.swift`, `Omnibox.swift`, `Updater.swift`, `Stage.swift`, and `Settings.swift`. It stops rather than guessing when an upstream code anchor changes.
 
 ## Tests
 
 ```bash
 python3 tests/patcher.test.py
 node tests/color-detector.test.js
-bash -n update-and-build.sh toggle-mode.command
+bash -n update-and-build.sh toggle-mode.command mod-update.command
 ```
 
-The tests cover patch application and JavaScript color heuristics. GitHub Actions also attempts a macOS/Xcode build to expose native compiler errors, but even a green build **does not guarantee correct UI behavior**. Real WebKit/SwiftUI visual testing remains necessary.
+The tests cover patch application and JavaScript color heuristics. GitHub Actions attempts a macOS 26/Xcode 26 build to expose compiler errors, but even a green build **does not guarantee correct UI behavior**. Real WebKit/SwiftUI visual testing remains necessary.
 
 ## Project status
 
-**Experimental v0.5** — an independent prototype, not a signed, verified browser release. Expect rough edges. The separate app may use Search's existing application identity and profile settings: back up your browser data before the first run. Do not treat this as an isolated browser security profile.
+**Experimental v0.6** — an independent prototype, not a signed, verified browser release. Expect rough edges. The separate app may use Search's existing application identity and profile settings: back up your browser data before the first run. Do not treat this as an isolated browser security profile.
 
 Contributions and bug reports are welcome, especially reproducible color mismatches and upstream patch conflicts. See [Contributing](CONTRIBUTING.md).
 
