@@ -154,16 +154,26 @@ def apply(repo: Path, kit: Path) -> None:
                 .modifier(CardEdge(on: cards && !browser.prefs.splitView))
                 .clipShape(AdaptiveChromePageCorners(radius:
                     AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && !browser.prefs.splitView && fullscreenTab == nil
-                    ? Metrics.cardRadius : 0))
-                // The corner cutouts must follow the actual page's frame, before
-                // its room/padding/offset transforms; a root-window overlay was
-                // offset from WKWebView's top and never reached the visible corners.
-                .overlay(alignment: .top) {
-                    if AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && !browser.prefs.splitView && fullscreenTab == nil {
-                        AdaptiveChromeTopCornerCutouts(browser: browser)
-                            .frame(height: Metrics.cardRadius)
+                    ? Metrics.cardRadius : 0))""", app)
+        changes['App.swift'] = s
+    # Search's TabBar is explicitly drawn *after* the stage in the window's
+    # ZStack (and above AppKit's WKWebView compositor). Anchor corner cutouts
+    # to the strip's bottom edge instead of the page, where even a correct
+    # StageView mask may be obscured by WebKit or an internal Search page.
+    if 'AdaptiveChromeTopCornerCutouts(browser: browser)' not in s:
+        s = one(s,
+            '''                TabBar(browser: browser)
+                    .transition(.move(edge: .top).combined(with: .opacity))''',
+            '''                TabBar(browser: browser)
+                    .overlay(alignment: .bottom) {
+                        if AdaptiveChrome.roundedTop && !cards && !browser.prefs.splitView {
+                            AdaptiveChromeTopCornerCutouts(browser: browser)
+                                .frame(height: Metrics.cardRadius)
+                                .offset(y: Metrics.cardRadius)
+                                .allowsHitTesting(false)
+                        }
                     }
-                }""", app)
+                    .transition(.move(edge: .top).combined(with: .opacity))''', app)
         changes['App.swift'] = s
     if 'topCornersOnly: AdaptiveChrome.roundedTop' not in s:
         s = one(s,

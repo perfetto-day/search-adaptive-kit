@@ -54,3 +54,8 @@
 - Removed root-window corner overlay and its guessed `chrome.height` offset; cutouts are now attached directly to the page stage **before** SwiftUI padding and motion transforms.
 - A visible pink cutout diagnostic is available only with `debug-on`, making wrong placement and an old app build easy to identify.
 - Peek shading remains unchanged and is applied once above the page-attached cutouts.
+
+### v0.7 — TabBar-hosted cutouts (verified install, diagnostics invisible)
+- The installed SHA and all toggles were verified on the user's Mac; pink diagnostic corners were still absent, including on Search's internal Settings page.
+- **Root cause:** the stage overlays were drawn under the separate TabBar and could be hidden by WKWebView/internal pages. The cutouts are now overlaid on **TabBar itself**, offset exactly 10 pt below its bottom edge. No border or page gap.
+- In debug mode, pink corners plus a clear **ROUND DEBUG** marker must appear at the top edge of the page, providing an unambiguous geometry check. Peek implementation remains untouched.

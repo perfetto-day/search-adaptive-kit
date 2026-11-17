@@ -30,6 +30,8 @@ SOURCES = {
             stage
                 .modifier(CardEdge(on: cards && !browser.prefs.splitView))
                 .padding(.leading, sideOnRight ? farGap + panelRoom : 0)
+                TabBar(browser: browser)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             .overlay { field }''',
 'Side.swift': '''struct SideBar: View {
         .environment(\\.greys, greys)
@@ -220,14 +222,14 @@ def check():
         assert 'if corner > 0 { updateCornerMask() }' in first['Stage.swift'].decode()
         assert 'AdaptiveChromePageCorners' in first['App.swift'].decode()
         assert 'AdaptiveChromeTopCornerCutouts(browser: browser)' in first['App.swift'].decode()
-        assert first['App.swift'].decode().index('AdaptiveChromeTopCornerCutouts') < first['App.swift'].decode().index('AdaptiveChromeTopShade')
-        # The overlay must be attached directly to the page before the outer
-        # padding/offset, not the root window with an inferred chrome height.
+        # The cutouts must be hosted by TabBar, which Search paints above
+        # WKWebView; a stage-attached overlay is invisible on some pages.
         app_source = first['App.swift'].decode()
-        assert ".clipShape(AdaptiveChromePageCorners(radius:" in app_source
-        assert app_source.index('AdaptiveChromeTopCornerCutouts') < app_source.index('                .padding(.leading, sideOnRight ? farGap')
-        assert '.padding(.top, chrome.height)' not in app_source
-        assert '.frame(height: Metrics.cardRadius)' in app_source
+        assert '.clipShape(AdaptiveChromePageCorners(radius:' in app_source
+        assert 'TabBar(browser: browser)\n                    .overlay(alignment: .bottom)' in app_source
+        assert '.offset(y: Metrics.cardRadius)' in app_source
+        assert app_source.index('AdaptiveChromeTopCornerCutouts(browser: browser)') > app_source.index('TabBar(browser: browser)')
+        assert 'ROUND DEBUG' in first['AdaptiveChrome.swift'].decode()
         assert 'if options.debug { Color.pink }' in first['AdaptiveChrome.swift'].decode()
         assert 'struct AdaptiveChromeCornerCutoutShape: Shape' in first['AdaptiveChrome.swift'].decode()
         assert 'AdaptiveChromeSurface(browser: browser, fallback: Palette.ground)' in first['AdaptiveChrome.swift'].decode()

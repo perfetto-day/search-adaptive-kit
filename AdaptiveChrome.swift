@@ -350,10 +350,10 @@ struct AdaptiveChromePageCorners: Shape {
     }
 }
 
-// Explicitly paint only the tiny pieces outside a rounded page corner.
-// WKWebView can draw in a separate compositor that ignores a parent mask.
-// These cutouts are overlaid *above* WebKit, using exactly the toolbar color;
-// there is no border, gutter, shadow or resizing of the page.
+// Paint only the tiny pieces outside a rounded page corner. SwiftUI's
+// stage mask can be bypassed by WKWebView's separate compositor. These
+// cutouts belong to the TabBar drawn *above* the stage and extend below its
+// bottom edge by the corner radius; no border, gutter or resizing.
 struct AdaptiveChromeCornerCutoutShape: Shape {
     var radius: CGFloat
 
@@ -391,11 +391,23 @@ struct AdaptiveChromeTopCornerCutouts: View {
             // Omnibox overlays. Their dimming is therefore applied exactly
             // once, just like it is for the rest of the page.
             AdaptiveChromeSurface(browser: browser, fallback: Palette.ground)
-            // Geometry diagnostic only: pink corners prove the cutouts really
-            // cover the web page's top pixels. Disabled in normal operation.
+            // Visible pink corners prove the cutouts cover the page. The
+            // temporary DEBUG marker makes an incorrect/absent layer obvious
+            // even in a small screenshot.
             if options.debug { Color.pink }
         }
         .mask(AdaptiveChromeCornerCutoutShape(radius: Metrics.cardRadius))
+        .overlay(alignment: .center) {
+            if options.debug {
+                Text("ROUND DEBUG")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 3)
+                    .background(Color.pink, in: Capsule())
+                    .offset(y: 16)
+            }
+        }
         .allowsHitTesting(false)
     }
 }
