@@ -1,0 +1,13 @@
+Search Adaptive Chrome v0.3 — non-macOS verification
+
+PASS  Python overlay application: twice, no duplicates.
+PASS  Upstream-anchor mismatch: stops without partially writing files.
+PASS  The omnibox overlay, text/input color, and search context hooks were inserted.
+PASS  WebKit detector's JavaScript: dark body with bright accent, modal 42% scrim, complex-background snapshot fallback.
+PASS  swiftc -frontend -parse AdaptiveChrome.swift (syntax only).
+PASS  bash -n update-and-build.sh.
+
+Not tested:
+- Full app build with Xcode on macOS.
+- Live WebKit/SwiftUI behavior and screenshots.
+- Pixel/snapshot performance on complex pages.

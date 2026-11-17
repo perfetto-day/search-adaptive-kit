@@ -1,0 +1,19 @@
+# Search Adaptive Kit Changelog
+
+## v0.3 — Search and smooth chrome
+
+- Smooth 240 ms color transitions when a site's theme/background changes.
+- Shared tint and fade between the omnibox scrim and native chrome, including horizontal/vertical tabs.
+- Search input, text, suggestions, and field backdrop follow active site's contrast and hue.
+- HSL lightness adjustments instead of neutral black/white mixing for active/hover/pinned tabs.
+- Bounded on-screen pixel verification of the visible top-of-page color after changes.
+- Hold the previous page color briefly while a navigation commits.
+- Update script still applies the patch to fresh upstream Search; no upstream fork required.
+
+## v0.2
+
+- Top-edge detection, modal dimming, shared UI palette, stable top toolbar, safe updater handling, debug marker.
+
+## v0.1
+
+- Initial adaptive chrome prototype for Search.
