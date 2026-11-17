@@ -49,3 +49,8 @@
 - Browser page corner rounding is now enforced by two tiny corner cutouts rendered **above** WKWebView, filled with the toolbar's adaptive background. This avoids WebKit compositor layers bypassing ordinary SwiftUI and CALayer masks.
 - The cutouts use no border, gutter or shadow; their fill follows Search and Peek overlay dimming. Existing Peek shading remains unchanged.
 - Added idempotence and integration assertions for the cutout layer.
+
+### v0.7 — corner placement correction
+- Removed root-window corner overlay and its guessed `chrome.height` offset; cutouts are now attached directly to the page stage **before** SwiftUI padding and motion transforms.
+- A visible pink cutout diagnostic is available only with `debug-on`, making wrong placement and an old app build easy to identify.
+- Peek shading remains unchanged and is applied once above the page-attached cutouts.

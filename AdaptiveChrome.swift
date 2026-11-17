@@ -383,30 +383,20 @@ struct AdaptiveChromeCornerCutoutShape: Shape {
 @MainActor
 struct AdaptiveChromeTopCornerCutouts: View {
     @ObservedObject var browser: Browser
-    @ObservedObject private var live: AdaptiveChromeLive
     @ObservedObject private var options = AdaptivePreferences.shared
-    @Environment(\.colorScheme) private var scheme
-
-    init(browser: Browser) {
-        self.browser = browser
-        _live = ObservedObject(wrappedValue: AdaptiveChromeLive.shared(for: browser))
-    }
 
     var body: some View {
         ZStack {
+            // This view is attached to the page *before* the outer Peek and
+            // Omnibox overlays. Their dimming is therefore applied exactly
+            // once, just like it is for the rest of the page.
             AdaptiveChromeSurface(browser: browser, fallback: Palette.ground)
-            // Match all dynamic effects applied to the strip, including Peek.
-            (live.palette?.searchScrim ?? (scheme == .dark ? Color.black.opacity(0.60) : Color.white.opacity(0.60)))
-                .opacity(options.enabled && options.searchTint && browser.fieldShowing ? 1 : 0)
-            Color.black.opacity(0.22)
-                .opacity(options.enabled && browser.peekInFront ? 1 : 0)
+            // Geometry diagnostic only: pink corners prove the cutouts really
+            // cover the web page's top pixels. Disabled in normal operation.
+            if options.debug { Color.pink }
         }
         .mask(AdaptiveChromeCornerCutoutShape(radius: Metrics.cardRadius))
-        .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
-        .animation(.easeInOut(duration: 0.18), value: browser.peekInFront)
         .allowsHitTesting(false)
-        .onAppear { live.follow(browser.active, browser: browser) }
-        .onChange(of: browser.activeID) { _, _ in live.follow(browser.active, browser: browser) }
     }
 }
 

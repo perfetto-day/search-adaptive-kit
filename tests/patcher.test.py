@@ -29,6 +29,7 @@ SOURCES = {
             Page(tab: tab, corner: cards ? Metrics.cardRadius : 0, browser: browser)
             stage
                 .modifier(CardEdge(on: cards && !browser.prefs.splitView))
+                .padding(.leading, sideOnRight ? farGap + panelRoom : 0)
             .overlay { field }''',
 'Side.swift': '''struct SideBar: View {
         .environment(\\.greys, greys)
@@ -220,9 +221,17 @@ def check():
         assert 'AdaptiveChromePageCorners' in first['App.swift'].decode()
         assert 'AdaptiveChromeTopCornerCutouts(browser: browser)' in first['App.swift'].decode()
         assert first['App.swift'].decode().index('AdaptiveChromeTopCornerCutouts') < first['App.swift'].decode().index('AdaptiveChromeTopShade')
+        # The overlay must be attached directly to the page before the outer
+        # padding/offset, not the root window with an inferred chrome height.
+        app_source = first['App.swift'].decode()
+        assert ".clipShape(AdaptiveChromePageCorners(radius:" in app_source
+        assert app_source.index('AdaptiveChromeTopCornerCutouts') < app_source.index('                .padding(.leading, sideOnRight ? farGap')
+        assert '.padding(.top, chrome.height)' not in app_source
+        assert '.frame(height: Metrics.cardRadius)' in app_source
+        assert 'if options.debug { Color.pink }' in first['AdaptiveChrome.swift'].decode()
         assert 'struct AdaptiveChromeCornerCutoutShape: Shape' in first['AdaptiveChrome.swift'].decode()
         assert 'AdaptiveChromeSurface(browser: browser, fallback: Palette.ground)' in first['AdaptiveChrome.swift'].decode()
-        assert '.padding(.top, chrome.height)' in first['App.swift'].decode()
+        assert '.padding(.top, chrome.height)' not in first['App.swift'].decode()
         assert 'AdaptiveChromePageCorners: Shape' in first['AdaptiveChrome.swift'].decode()
         assert 'browser.peekInFront' in first['AdaptiveChrome.swift'].decode()
         assert 'Color.black.opacity(0.22)' in first['AdaptiveChrome.swift'].decode()

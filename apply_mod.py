@@ -138,14 +138,6 @@ def apply(repo: Path, kit: Path) -> None:
         s = one(s,
             '            .overlay { field }',
             """            .overlay(alignment: .top) {
-                if AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && !browser.prefs.splitView && fullscreenTab == nil {
-                    AdaptiveChromeTopCornerCutouts(browser: browser)
-                        .frame(height: Metrics.cardRadius)
-                        .padding(.top, chrome.height)
-                        .ignoresSafeArea()
-                }
-            }
-            .overlay(alignment: .top) {
                 if !browser.prefs.sidebar && fullscreenTab == nil {
                     AdaptiveChromeTopShade(browser: browser)
                         .frame(height: chrome.height)
@@ -162,7 +154,16 @@ def apply(repo: Path, kit: Path) -> None:
                 .modifier(CardEdge(on: cards && !browser.prefs.splitView))
                 .clipShape(AdaptiveChromePageCorners(radius:
                     AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && !browser.prefs.splitView && fullscreenTab == nil
-                    ? Metrics.cardRadius : 0))""", app)
+                    ? Metrics.cardRadius : 0))
+                // The corner cutouts must follow the actual page's frame, before
+                // its room/padding/offset transforms; a root-window overlay was
+                // offset from WKWebView's top and never reached the visible corners.
+                .overlay(alignment: .top) {
+                    if AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && !browser.prefs.splitView && fullscreenTab == nil {
+                        AdaptiveChromeTopCornerCutouts(browser: browser)
+                            .frame(height: Metrics.cardRadius)
+                    }
+                }""", app)
         changes['App.swift'] = s
     if 'topCornersOnly: AdaptiveChrome.roundedTop' not in s:
         s = one(s,

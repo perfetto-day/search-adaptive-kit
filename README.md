@@ -35,7 +35,7 @@ This is **not** a Chrome / Safari extension. Search's interface is written in Sw
 | **Unified search overlay** | Keeps the last reliable page color; dims tabs/icons on search and matches Peek's 22% page shade |
 | **Modal awareness** | Mirrors the actual RGB tint and alpha of common CSS modal backdrops |
 | **Pixel validation** | Uses limited, occasional WebKit snapshots when CSS sampling is ambiguous |
-| **Seamless rounded page top** | Compositor-safe top corner cutouts matching the adaptive toolbar, without border, gutter or shadow |\n| **Release notifications** | Optional official release checks (ON by default), never overwriting the patched app |\n| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
+| **Seamless rounded page top** | Stage-anchored top corner cutouts matching the adaptive toolbar; debug-on shows pink diagnostic corners |\n| **Release notifications** | Optional official release checks (ON by default), never overwriting the patched app |\n| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
 
 The color detector is heuristic. Complex canvases, videos, gradients, custom overlays, translucent content and split-screen layouts may not match perfectly.
 
@@ -78,7 +78,7 @@ Go to `search://settings/appearance` → **Search Adaptive** for native-styled s
 
 For **optional GitHub-based mod updates**, click **Check GitHub branches and tags**, select a branch or tag and review its exact commit SHA, then choose **Download & Build**. The build runs locally in a dedicated managed checkout and is **never automatically installed**. After a successful build, confirm **Install & Restart**. A failed build leaves the currently installed app untouched. Selecting a remote revision and building it executes that revision's code on your Mac; only use trusted commits.
 
-### Controls
+The page rounding diagnostic is **pink only while** `debug-on` is active. Disable diagnostics after checking the geometry.\n\n### Controls
 
 ```bash
 ./toggle-mode.command on          # adaptive UI
