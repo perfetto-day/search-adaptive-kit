@@ -305,6 +305,15 @@ struct AdaptiveChromeStyle: ViewModifier {
                     .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
                     .allowsHitTesting(false)
             }
+            .overlay {
+                // Peek shades the web page by a fixed 22% in Search's PeekLayer.
+                // Shade the vertical sidebar by the same amount; horizontal tabs
+                // are handled once at window level by AdaptiveChromeTopShade.
+                Color.black.opacity(0.22)
+                    .opacity(shadeSearch && options.enabled && browser.peekInFront ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.18), value: browser.peekInFront)
+                    .allowsHitTesting(false)
+            }
             .overlay(alignment: .bottomTrailing) {
                 if diagnostic && AdaptiveChrome.debug {
                     Text("\(live.report.source): \(live.report.hex.isEmpty ? "—" : live.report.hex)  shade \(Int(live.dim * 100))%")
@@ -323,6 +332,24 @@ struct AdaptiveChromeStyle: ViewModifier {
 }
 
 
+// WebKit is hosted by an NSViewRepresentable. Its StageView has a native
+// layer-backed corner mask, but SwiftUI overlays (loading covers, reader UI)
+// are siblings of that view. Clip the whole stage as well so all visible
+// surfaces have the same top-only silhouette without a gutter or outline.
+struct AdaptiveChromePageCorners: Shape {
+    var radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        guard radius > 0 else { return Path(rect) }
+        let r = min(radius, rect.width / 2, rect.height / 2)
+        return UnevenRoundedRectangle(
+            topLeadingRadius: r, bottomLeadingRadius: 0,
+            bottomTrailingRadius: 0, topTrailingRadius: r,
+            style: .continuous
+        ).path(in: rect)
+    }
+}
+
 // Covers the *entire* top strip after Search has composed its tabs, icons and
 // buttons, but before the omnibox is presented. Unlike a TabBar background it
 // therefore shades tab glyphs and hover states as well as the strip itself.
@@ -338,12 +365,21 @@ struct AdaptiveChromeTopShade: View {
         _live = ObservedObject(wrappedValue: AdaptiveChromeLive.shared(for: browser))
     }
     var body: some View {
-        (live.palette?.searchScrim ?? (scheme == .dark ? Color.black.opacity(0.60) : Color.white.opacity(0.60)))
-            .opacity(options.enabled && options.searchTint && browser.fieldShowing ? 1 : 0)
-            .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
-            .allowsHitTesting(false)
-            .onAppear { live.follow(browser.active, browser: browser) }
-            .onChange(of: browser.activeID) { _, _ in live.follow(browser.active, browser: browser) }
+        ZStack {
+            // Search overlays this same tint over only the page when its URL
+            // field opens. Match the entire horizontal strip after tab icons.
+            (live.palette?.searchScrim ?? (scheme == .dark ? Color.black.opacity(0.60) : Color.white.opacity(0.60)))
+                .opacity(options.enabled && options.searchTint && browser.fieldShowing ? 1 : 0)
+            // PeekLayer darkens the web page by 0.22 but intentionally skips
+            // chrome. Reproduce that tint here, including tab labels/buttons.
+            Color.black.opacity(0.22)
+                .opacity(options.enabled && browser.peekInFront ? 1 : 0)
+        }
+        .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
+        .animation(.easeInOut(duration: 0.18), value: browser.peekInFront)
+        .allowsHitTesting(false)
+        .onAppear { live.follow(browser.active, browser: browser) }
+        .onChange(of: browser.activeID) { _, _ in live.follow(browser.active, browser: browser) }
     }
 }
 

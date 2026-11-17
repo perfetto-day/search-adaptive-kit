@@ -175,6 +175,10 @@ final class StageView: NSView {
             layer?.masksToBounds = corner > 0
         }
     }
+    override func layout() {
+        super.layout()
+        settle()
+    }
 }
 '''
 }
@@ -211,6 +215,12 @@ def check():
         assert 'AdaptiveSettings' in first['AdaptiveSettings.swift'].decode()
         assert 'topCornersOnly' in first['Stage.swift'].decode()
         assert 'layerMinXMaxYCorner' in first['Stage.swift'].decode()
+        assert 'isGeometryFlipped' in first['Stage.swift'].decode()
+        assert 'if corner > 0 { updateCornerMask() }' in first['Stage.swift'].decode()
+        assert 'AdaptiveChromePageCorners' in first['App.swift'].decode()
+        assert 'AdaptiveChromePageCorners: Shape' in first['AdaptiveChrome.swift'].decode()
+        assert 'browser.peekInFront' in first['AdaptiveChrome.swift'].decode()
+        assert 'Color.black.opacity(0.22)' in first['AdaptiveChrome.swift'].decode()
         assert 'updateChecksEnabled' in first['Updater.swift'].decode()
         assert 'Rebuild Search Adaptive' in first['Updater.swift'].decode()
         assert 'if AdaptiveChrome.installed' in first['Updater.swift'].decode()

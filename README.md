@@ -32,10 +32,10 @@ This is **not** a Chrome / Safari extension. Search's interface is written in Sw
 | **Adaptive toolbar** | Estimates the top-of-page background, prioritizing visible colors over page accent metadata |
 | **Tinted tabs** | Uses hue-preserving HSL lightness adjustments for active, hovered and pinned tabs |
 | **Smooth transitions** | Animates compatible color changes (~240 ms), without animating toolbar position |
-| **Unified search overlay** | Keeps the last reliable page color; dims tabs/icons together and leaves a brighter input on light pages |
+| **Unified search overlay** | Keeps the last reliable page color; dims tabs/icons on search and matches Peek's 22% page shade |
 | **Modal awareness** | Mirrors the actual RGB tint and alpha of common CSS modal backdrops |
 | **Pixel validation** | Uses limited, occasional WebKit snapshots when CSS sampling is ambiguous |
-| **Seamless rounded page top** | Native AppKit top-corner clipping, without a drawn border, gutter or additional shadow |\n| **Release notifications** | Optional official release checks (ON by default), never overwriting the patched app |\n| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
+| **Seamless rounded page top** | Combined AppKit + SwiftUI top-corner masking, without a border, gutter or artificial shadow |\n| **Release notifications** | Optional official release checks (ON by default), never overwriting the patched app |\n| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
 
 The color detector is heuristic. Complex canvases, videos, gradients, custom overlays, translucent content and split-screen layouts may not match perfectly.
 

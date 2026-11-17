@@ -145,8 +145,16 @@ def apply(repo: Path, kit: Path) -> None:
                 }
             }
             .overlay { field }""", app)
-        # Keep the stage flush with the tab strip. Native StageView already
-        # clips its top corners, so a drawn stroke/gutter would break seamless.
+        # Add a second clip around the *whole* stage, not just its WKWebView.
+        # This also masks SwiftUI reader/cover overlays, without any border.
+        s = one(s,
+            '''            stage
+                .modifier(CardEdge(on: cards && !browser.prefs.splitView))''',
+            """            stage
+                .modifier(CardEdge(on: cards && !browser.prefs.splitView))
+                .clipShape(AdaptiveChromePageCorners(radius:
+                    AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && !browser.prefs.splitView && fullscreenTab == nil
+                    ? Metrics.cardRadius : 0))""", app)
         changes['App.swift'] = s
     if 'topCornersOnly: AdaptiveChrome.roundedTop' not in s:
         s = one(s,
@@ -195,11 +203,32 @@ def apply(repo: Path, kit: Path) -> None:
         wantsLayer = true
         layer?.cornerRadius = corner
         layer?.cornerCurve = .continuous
-        // Core Animation uses bottom-left coordinates: MaxY is the page top.
-        layer?.maskedCorners = topCornersOnly
-            ? [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-            : [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        // Account for layers whose Y axis is inverted by AppKit hosting.
+        // Never select the bottom two corners for the top-only page style.
+        if topCornersOnly {
+            layer?.maskedCorners = layer?.isGeometryFlipped == true
+                ? [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+                : [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        } else {
+            layer?.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner,
+                                    .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        }
         layer?.masksToBounds = corner > 0
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if corner > 0 { updateCornerMask() }
+    }''', stage)
+        s = one(s,
+            '''    override func layout() {
+        super.layout()
+        settle()
+    }''',
+            '''    override func layout() {
+        super.layout()
+        if corner > 0 { updateCornerMask() }
+        settle()
     }''', stage)
         changes['Stage.swift'] = s
 

@@ -1,11 +1,8 @@
-Search Adaptive Kit v0.7 — local verification
+Search Adaptive v0.7 (Peek + top-corner fixes) — local checks
 
-PASS python3 tests/patcher.test.py — guarded application, idempotence, fail-closed handling on upstream changes, native Settings Card/SettingRow and border-free rounding anchors.
-PASS node tests/color-detector.test.js — dark-accent, modal, light/color overlays, gradient fallback.
-PASS bash -n update-and-build.sh toggle-mode.command mod-update.command
-PASS swiftc -frontend -parse AdaptiveChrome.swift
-PASS swiftc -frontend -parse AdaptiveSettings.swift
-PASS python3 -m py_compile apply_mod.py
+PASS: python3 tests/patcher.test.py
+PASS: node tests/color-detector.test.js
+PASS: bash -n update-and-build.sh toggle-mode.command mod-update.command
+PASS: swiftc -frontend -parse AdaptiveChrome.swift AdaptiveSettings.swift
 
-macOS/Xcode full build: pending GitHub Actions CI check for PR #3.
-Apple Passwords and Passkeys: require proper app signing and Apple authorizations, not verified for ad-hoc local app.
+Added regression checks for Peek tint parity, SwiftUI + AppKit top-edge masks, layout-time mask updates, and idempotent patching. Native Swift type-check/build and real macOS UI verification must run in GitHub Actions / on the target Mac.

@@ -2,6 +2,9 @@
 
 ## v0.7 — Native settings & seamless page top corners
 
+- Fixed Peek-mode dimming: the native horizontal tab strip, its icons and buttons now get the same 22% black overlay as Search's page scrim; vertical sidebar controls follow the same dimming.
+- Hardened top-only rounded corners by clipping both the full SwiftUI page stage (including loading overlays) and its AppKit WebView host. The native corner mask refreshes on layout/window rehosting and respects flipped layer geometry.
+- No artificial outline, border, gutter or added shadow is introduced.
 - Rebuilt Appearance controls using Search's native `GroupBlock` → `Card` → `SettingRow` / `Rule` / `Switch` / `Pill` components instead of stock-blue SwiftUI toggles and free-floating buttons.
 - Split color controls and GitHub mod updater into two correctly styled settings groups, preserving the existing explicit build/install confirmations.
 - Removed the custom page-top outline, drawn border, and artificial 5-point gutter. Native AppKit clipping still rounds only the top corners when the horizontal tabbar is in use; same-color pages remain seamless.
