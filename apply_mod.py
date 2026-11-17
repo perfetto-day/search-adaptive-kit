@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Search Adaptive v0.6 overlay. Validates all anchors before touching files.
+"""Search Adaptive v0.7 overlay. Validates all anchors before touching files.
 
 Works against a clean upstream checkout; safe to run twice on the same checkout.
 The update script always restores upstream main first so a new release is never
@@ -32,7 +32,7 @@ def apply(repo: Path, kit: Path) -> None:
             '    @Published private(set) var cover: NSImage?',
             '''    @Published private(set) var cover: NSImage?
 
-    // Search Adaptive v0.6. Only the active Tab's report is drawn in the chrome.
+    // Search Adaptive v0.7. Only the active Tab's report is drawn in the chrome.
     @Published private(set) var adaptiveChromeReport = AdaptiveChromeReport()
     private let adaptiveChromeRelay = AdaptiveChromeRelay()
     private var adaptiveChromeGeneration = 0
@@ -145,20 +145,35 @@ def apply(repo: Path, kit: Path) -> None:
                 }
             }
             .overlay { field }""", app)
+        # Add a second clip around the *whole* stage, not just its WKWebView.
+        # This also masks SwiftUI reader/cover overlays, without any border.
         s = one(s,
-            """            stage
-                .modifier(CardEdge(on: cards && !browser.prefs.splitView))""",
+            '''            stage
+                .modifier(CardEdge(on: cards && !browser.prefs.splitView))''',
             """            stage
                 .modifier(CardEdge(on: cards && !browser.prefs.splitView))
-                .overlay(alignment: .top) {
-                    if AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && fullscreenTab == nil {
-                        AdaptiveChromeTopEdge()
-                            .stroke(Color.primary.opacity(0.14), lineWidth: 1)
-                            .frame(height: 12)
-                            .allowsHitTesting(false)
+                .clipShape(AdaptiveChromePageCorners(radius:
+                    AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && browser.activeSplit == nil && fullscreenTab == nil
+                    ? Metrics.cardRadius : 0))""", app)
+        changes['App.swift'] = s
+    # Search's TabBar is explicitly drawn *after* the stage in the window's
+    # ZStack (and above AppKit's WKWebView compositor). Anchor corner cutouts
+    # to the strip's bottom edge instead of the page, where even a correct
+    # StageView mask may be obscured by WebKit or an internal Search page.
+    if 'AdaptiveChromeTopCornerCutouts(browser: browser)' not in s:
+        s = one(s,
+            '''                TabBar(browser: browser)
+                    .transition(.move(edge: .top).combined(with: .opacity))''',
+            '''                TabBar(browser: browser)
+                    .overlay(alignment: .bottom) {
+                        if AdaptiveChrome.roundedTop && !cards && browser.activeSplit == nil {
+                            AdaptiveChromeTopCornerCutouts(browser: browser)
+                                .frame(height: Metrics.cardRadius)
+                                .offset(y: Metrics.cardRadius)
+                                .allowsHitTesting(false)
+                        }
                     }
-                }
-                .padding(.top, AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && fullscreenTab == nil ? 5 : 0)""", app)
+                    .transition(.move(edge: .top).combined(with: .opacity))''', app)
         changes['App.swift'] = s
     if 'topCornersOnly: AdaptiveChrome.roundedTop' not in s:
         s = one(s,
@@ -207,11 +222,32 @@ def apply(repo: Path, kit: Path) -> None:
         wantsLayer = true
         layer?.cornerRadius = corner
         layer?.cornerCurve = .continuous
-        // Core Animation uses bottom-left coordinates: MaxY is the page top.
-        layer?.maskedCorners = topCornersOnly
-            ? [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-            : [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        // Account for layers whose Y axis is inverted by AppKit hosting.
+        // Never select the bottom two corners for the top-only page style.
+        if topCornersOnly {
+            layer?.maskedCorners = layer?.isGeometryFlipped == true
+                ? [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+                : [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        } else {
+            layer?.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner,
+                                    .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        }
         layer?.masksToBounds = corner > 0
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if corner > 0 { updateCornerMask() }
+    }''', stage)
+        s = one(s,
+            '''    override func layout() {
+        super.layout()
+        settle()
+    }''',
+            '''    override func layout() {
+        super.layout()
+        if corner > 0 { updateCornerMask() }
+        settle()
     }''', stage)
         changes['Stage.swift'] = s
 
@@ -378,7 +414,10 @@ struct Omnibox: View {
             '''        case .appearance:
             groups(of: page)
             GroupBlock(title: "Search Adaptive", icon: "paintbrush.pointed") {
-                AdaptiveSettingsPanel(browser: browser)
+                Card { AdaptiveSettingsPanel(browser: browser) }
+            }
+            GroupBlock(title: "Mod updates", icon: "arrow.triangle.2.circlepath") {
+                Card { AdaptiveUpdateSettingsPanel() }
             }
         case .keyboard:
             groups(of: page)''', settings)
@@ -433,7 +472,7 @@ struct Omnibox: View {
             path.write_text(content, encoding='utf8')
     for module in modules:
         shutil.copy2(kit / module, root / module)
-    print('Applied Search Adaptive Chrome v0.6 (8 integration files + 2 modules).')
+    print('Applied Search Adaptive Chrome v0.7 (8 integration files + 2 modules).')
     print('Enable before launch: defaults write com.officecommun.search adaptive.chrome.enabled -bool true')
 
 

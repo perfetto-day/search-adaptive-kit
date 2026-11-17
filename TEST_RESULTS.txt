@@ -1,10 +1,8 @@
-Search Adaptive v0.5 — local non-macOS validation
+Search Adaptive v0.7 (Peek + top-corner fixes) — local checks
 
-PASS: Python overlay fixture test (7 files, repeated application unchanged, safe stop on invalid upstream anchor)
-PASS: JS DOM detector (dark + accent; colored/light modal shade; gradient snapshot fallback)
-PASS: swiftc -frontend -parse AdaptiveChrome.swift (syntax only; not SwiftUI typechecking)
-PASS: bash -n update-and-build.sh toggle-mode.command
-PASS: Python source compilation
+PASS: python3 tests/patcher.test.py
+PASS: node tests/color-detector.test.js
+PASS: bash -n update-and-build.sh toggle-mode.command mod-update.command
+PASS: swiftc -frontend -parse AdaptiveChrome.swift AdaptiveSettings.swift
 
-Not verified: full macOS/Xcode build, native WKWebView top-corner clipping in a live app,
-real new-tab Search palette with an actual website, update feed detection on macOS.
+Added regression checks for Peek tint parity, SwiftUI + AppKit top-edge masks, layout-time mask updates, and idempotent patching. Native Swift type-check/build and real macOS UI verification must run in GitHub Actions / on the target Mac.

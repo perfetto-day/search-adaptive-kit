@@ -169,66 +169,104 @@ final class AdaptiveModUpdater: ObservableObject {
     }
 }
 
+// Use the same row, rule, switch, and pill as Search's own Settings.
+// The parent SettingsPanel wraps these rows in Search's Card/GroupBlock.
 @MainActor
 struct AdaptiveSettingsPanel: View {
     @ObservedObject var browser: Browser
     @ObservedObject private var options = AdaptivePreferences.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SettingRow(icon: "paintbrush", title: "Adaptive website colors",
+                       detail: "Match the tab bar and sidebar to the active website") {
+                Switch(on: $options.enabled)
+            }
+            Rule()
+            SettingRow(icon: "magnifyingglass", title: "Adaptive search overlay",
+                       detail: "Keep the search field and dimmed toolbar consistent") {
+                Switch(on: $options.searchTint)
+            }
+            Rule()
+            SettingRow(icon: "square.on.square", title: "Round page top corners",
+                       detail: "Gently round the page below horizontal tabs, without borders") {
+                Switch(on: $options.roundedTop)
+            }
+            Rule()
+            SettingRow(icon: "eyeglasses", title: "Show color diagnostics",
+                       detail: "Show the page color source and sampled hex value") {
+                Switch(on: $options.debug)
+            }
+            Rule()
+            SettingRow(icon: "arrow.triangle.2.circlepath", title: "Check official Search releases",
+                       detail: "Announce new versions without replacing this modified build") {
+                Switch(on: $options.updateChecks)
+            }
+        }
+    }
+}
+
+@MainActor
+struct AdaptiveUpdateSettingsPanel: View {
     @ObservedObject private var updater = AdaptiveModUpdater.shared
     @State private var confirmBuild = false
     @State private var confirmInstall = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Toggle("Adaptive website colors", isOn: $options.enabled)
-            Toggle("Adaptive search overlay", isOn: $options.searchTint)
-            Toggle("Round page top corners", isOn: $options.roundedTop)
-            Toggle("Show color diagnostics", isOn: $options.debug)
-            Toggle("Check official Search releases", isOn: $options.updateChecks)
-            Text("These switches control the same preferences as toggle-mode.command. Reload open pages after enabling colors; restart for corner geometry.")
-                .font(.system(size: 11)).foregroundStyle(Palette.muted)
-
-            Divider()
-            Text("Search Adaptive updates").font(.system(size: 13, weight: .semibold))
-            Text("Installed: \(updater.installedDescription)")
-                .font(.system(size: 11)).foregroundStyle(Palette.muted)
-            Button("Check GitHub branches and tags") { updater.checkGitHub() }
-                .disabled(updater.checking || updater.building)
+        VStack(spacing: 0) {
+            SettingRow(icon: "shippingbox", title: "Search Adaptive",
+                       detail: "Installed: \(updater.installedDescription)",
+                       more: "This mod is maintained separately from official Search releases.") {
+                Pill("Check GitHub") { updater.checkGitHub() }
+                    .disabled(updater.checking || updater.building)
+            }
             if !updater.references.isEmpty {
-                Picker("GitHub revision", selection: $updater.selectedID) {
-                    ForEach(updater.references) { entry in
-                        Text("\(entry.kind): \(entry.title)").tag(entry.id)
+                Rule()
+                SettingRow(icon: "point.3.connected.trianglepath.dotted", title: "Choose a revision",
+                           detail: "Select a branch or tag and review the exact Git commit", wide: true) {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Picker("GitHub revision", selection: $updater.selectedID) {
+                            ForEach(updater.references) { entry in
+                                Text("\(entry.kind): \(entry.title)").tag(entry.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(spacing: 8) {
+                            Pill("Download & Build", filled: true) { confirmBuild = true }
+                                .disabled(updater.building || updater.selected == nil)
+                            if updater.staged {
+                                Pill("Install & Restart") { confirmInstall = true }
+                                    .disabled(updater.building)
+                            }
+                        }
                     }
-                }
-                .pickerStyle(.menu)
-                HStack(spacing: 8) {
-                    Button("Download & Build") { confirmBuild = true }
-                        .disabled(updater.building || updater.selected == nil)
-                    if updater.staged {
-                        Button("Install & Restart") { confirmInstall = true }
-                            .disabled(updater.building)
-                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            Text(updater.status)
-                .font(.system(size: 11)).foregroundStyle(Palette.muted)
-            if updater.building { ProgressView().controlSize(.small) }
-            Text("Only this project's GitHub repository is supported. Building a selected commit executes its source code on this Mac. Never choose a revision you do not trust. Installation is a separate confirmation; a failed build preserves your current app.")
-                .font(.system(size: 10)).foregroundStyle(Palette.muted)
+            Rule()
+            SettingRow(icon: "info.circle", title: "Update status",
+                       detail: updater.status,
+                       more: "A remote revision is compiled locally only after you approve it. Installation is a separate confirmation. Building untrusted code is unsafe.") {
+                if updater.building || updater.checking {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Always(text: updater.staged ? "Ready to install" : "Manual")
+                }
+            }
         }
-        .toggleStyle(.switch)
-        .font(.system(size: 12))
-        .padding(14)
         .confirmationDialog("Build and run code from GitHub?", isPresented: $confirmBuild) {
             Button("Download & Build \(updater.selected?.title ?? "")") { updater.downloadAndBuild() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The selected commit's build scripts will execute locally. Review the source before continuing; no update is installed until you approve it separately.")
+            Text("The selected commit's build scripts will execute locally. Review the source first. Nothing installs until you approve it separately.")
         }
         .confirmationDialog("Replace Search Adaptive and restart?", isPresented: $confirmInstall) {
             Button("Install & Restart") { updater.installAndRestart() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The staged build will replace only Search Adaptive.app after this app quits. A backup is kept during installation.")
+            Text("The staged build replaces Search Adaptive.app only after the current app quits. A backup is kept during installation.")
         }
     }
 }

@@ -16,7 +16,7 @@ struct AdaptiveChromeReport: Equatable {
 @MainActor
 enum AdaptiveChrome {
     static let installed = true // Never install a stock Search binary over our app.
-    static let kitVersion = "v0.6"
+    static let kitVersion = "v0.7"
     static let colorTransition: Animation = .easeInOut(duration: 0.24)
     static let settingsKey = "adaptive.chrome.enabled"
     // Notifications about official Search releases are on by default. Never
@@ -305,6 +305,15 @@ struct AdaptiveChromeStyle: ViewModifier {
                     .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
                     .allowsHitTesting(false)
             }
+            .overlay {
+                // Peek shades the web page by a fixed 22% in Search's PeekLayer.
+                // Shade the vertical sidebar by the same amount; horizontal tabs
+                // are handled once at window level by AdaptiveChromeTopShade.
+                Color.black.opacity(0.22)
+                    .opacity(shadeSearch && options.enabled && browser.peekInFront ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.18), value: browser.peekInFront)
+                    .allowsHitTesting(false)
+            }
             .overlay(alignment: .bottomTrailing) {
                 if diagnostic && AdaptiveChrome.debug {
                     Text("\(live.report.source): \(live.report.hex.isEmpty ? "—" : live.report.hex)  shade \(Int(live.dim * 100))%")
@@ -323,17 +332,83 @@ struct AdaptiveChromeStyle: ViewModifier {
 }
 
 
-// A faint, top-only outline makes the native rounding visible even when the
-// WebKit page has exactly the same background color as the adjacent toolbar.
-struct AdaptiveChromeTopEdge: Shape {
+// WebKit is hosted by an NSViewRepresentable. Its StageView has a native
+// layer-backed corner mask, but SwiftUI overlays (loading covers, reader UI)
+// are siblings of that view. Clip the whole stage as well so all visible
+// surfaces have the same top-only silhouette without a gutter or outline.
+struct AdaptiveChromePageCorners: Shape {
+    var radius: CGFloat
+
     func path(in rect: CGRect) -> Path {
-        let radius: CGFloat = min(10, rect.width / 3)
+        guard radius > 0 else { return Path(rect) }
+        let r = min(radius, rect.width / 2, rect.height / 2)
+        return UnevenRoundedRectangle(
+            topLeadingRadius: r, bottomLeadingRadius: 0,
+            bottomTrailingRadius: 0, topTrailingRadius: r,
+            style: .continuous
+        ).path(in: rect)
+    }
+}
+
+// Paint only the tiny pieces outside a rounded page corner. SwiftUI's
+// stage mask can be bypassed by WKWebView's separate compositor. These
+// cutouts belong to the TabBar drawn *above* the stage and extend below its
+// bottom edge by the corner radius; no border, gutter or resizing.
+struct AdaptiveChromeCornerCutoutShape: Shape {
+    var radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let r = min(radius, rect.width / 2, rect.height)
+        guard r > 0 else { return Path() }
+        // Cubic Bezier approximation of a quarter circle.
+        let k: CGFloat = 0.552284749831
         var path = Path()
-        path.move(to: CGPoint(x: 0, y: radius))
-        path.addArc(tangent1End: CGPoint(x: 0, y: 0), tangent2End: CGPoint(x: radius, y: 0), radius: radius)
-        path.addLine(to: CGPoint(x: max(radius, rect.maxX - radius), y: 0))
-        path.addArc(tangent1End: CGPoint(x: rect.maxX, y: 0), tangent2End: CGPoint(x: rect.maxX, y: radius), radius: radius)
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.minY))
+        path.addCurve(to: CGPoint(x: rect.minX, y: rect.minY + r),
+                      control1: CGPoint(x: rect.minX + r * (1 - k), y: rect.minY),
+                      control2: CGPoint(x: rect.minX, y: rect.minY + r * (1 - k)))
+        path.closeSubpath()
+        path.move(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + r))
+        path.addCurve(to: CGPoint(x: rect.maxX - r, y: rect.minY),
+                      control1: CGPoint(x: rect.maxX, y: rect.minY + r * (1 - k)),
+                      control2: CGPoint(x: rect.maxX - r * (1 - k), y: rect.minY))
+        path.closeSubpath()
         return path
+    }
+}
+
+@MainActor
+struct AdaptiveChromeTopCornerCutouts: View {
+    @ObservedObject var browser: Browser
+    @ObservedObject private var options = AdaptivePreferences.shared
+
+    var body: some View {
+        ZStack {
+            // This view is attached to the page *before* the outer Peek and
+            // Omnibox overlays. Their dimming is therefore applied exactly
+            // once, just like it is for the rest of the page.
+            AdaptiveChromeSurface(browser: browser, fallback: Palette.ground)
+            // Visible pink corners prove the cutouts cover the page. The
+            // temporary DEBUG marker makes an incorrect/absent layer obvious
+            // even in a small screenshot.
+            if options.debug { Color.pink }
+        }
+        .mask(AdaptiveChromeCornerCutoutShape(radius: Metrics.cardRadius))
+        .overlay(alignment: .center) {
+            if options.debug {
+                Text("ROUND DEBUG")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 3)
+                    .background(Color.pink, in: Capsule())
+                    .offset(y: 16)
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 
@@ -352,12 +427,21 @@ struct AdaptiveChromeTopShade: View {
         _live = ObservedObject(wrappedValue: AdaptiveChromeLive.shared(for: browser))
     }
     var body: some View {
-        (live.palette?.searchScrim ?? (scheme == .dark ? Color.black.opacity(0.60) : Color.white.opacity(0.60)))
-            .opacity(options.enabled && options.searchTint && browser.fieldShowing ? 1 : 0)
-            .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
-            .allowsHitTesting(false)
-            .onAppear { live.follow(browser.active, browser: browser) }
-            .onChange(of: browser.activeID) { _, _ in live.follow(browser.active, browser: browser) }
+        ZStack {
+            // Search overlays this same tint over only the page when its URL
+            // field opens. Match the entire horizontal strip after tab icons.
+            (live.palette?.searchScrim ?? (scheme == .dark ? Color.black.opacity(0.60) : Color.white.opacity(0.60)))
+                .opacity(options.enabled && options.searchTint && browser.fieldShowing ? 1 : 0)
+            // PeekLayer darkens the web page by 0.22 but intentionally skips
+            // chrome. Reproduce that tint here, including tab labels/buttons.
+            Color.black.opacity(0.22)
+                .opacity(options.enabled && browser.peekInFront ? 1 : 0)
+        }
+        .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
+        .animation(.easeInOut(duration: 0.18), value: browser.peekInFront)
+        .allowsHitTesting(false)
+        .onAppear { live.follow(browser.active, browser: browser) }
+        .onChange(of: browser.activeID) { _, _ in live.follow(browser.active, browser: browser) }
     }
 }
 

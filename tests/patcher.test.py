@@ -29,6 +29,9 @@ SOURCES = {
             Page(tab: tab, corner: cards ? Metrics.cardRadius : 0, browser: browser)
             stage
                 .modifier(CardEdge(on: cards && !browser.prefs.splitView))
+                .padding(.leading, sideOnRight ? farGap + panelRoom : 0)
+                TabBar(browser: browser)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             .overlay { field }''',
 'Side.swift': '''struct SideBar: View {
         .environment(\\.greys, greys)
@@ -175,6 +178,10 @@ final class StageView: NSView {
             layer?.masksToBounds = corner > 0
         }
     }
+    override func layout() {
+        super.layout()
+        settle()
+    }
 }
 '''
 }
@@ -199,12 +206,40 @@ def check():
         assert 'AdaptiveChromeSearchContext' in first['App.swift'].decode()
         assert 'AdaptiveChromePalette' in first['AdaptiveChrome.swift'].decode()
         assert 'shade: AdaptiveChrome.parse(shade)' in first['Tab.swift'].decode()
-        assert 'Search Adaptive v0.6' in first['Tab.swift'].decode()
+        assert 'Search Adaptive v0.7' in first['Tab.swift'].decode()
         assert 'AdaptiveSettingsPanel(browser: browser)' in first['Settings.swift'].decode()
+        assert 'Card { AdaptiveSettingsPanel(browser: browser) }' in first['Settings.swift'].decode()
+        assert 'Card { AdaptiveUpdateSettingsPanel() }' in first['Settings.swift'].decode()
+        assert 'AdaptiveChromeTopEdge' not in first['App.swift'].decode()
+        assert '.padding(.top, AdaptiveChrome.roundedTop' not in first['App.swift'].decode()
+        assert 'SettingRow(icon: "paintbrush"' in first['AdaptiveSettings.swift'].decode()
+        assert 'Switch(on: $options.enabled)' in first['AdaptiveSettings.swift'].decode()
         assert 'AdaptiveChromeTopShade' in first['App.swift'].decode()
         assert 'AdaptiveSettings' in first['AdaptiveSettings.swift'].decode()
         assert 'topCornersOnly' in first['Stage.swift'].decode()
         assert 'layerMinXMaxYCorner' in first['Stage.swift'].decode()
+        assert 'isGeometryFlipped' in first['Stage.swift'].decode()
+        assert 'if corner > 0 { updateCornerMask() }' in first['Stage.swift'].decode()
+        assert 'AdaptiveChromePageCorners' in first['App.swift'].decode()
+        assert 'AdaptiveChromeTopCornerCutouts(browser: browser)' in first['App.swift'].decode()
+        # The cutouts must be hosted by TabBar, which Search paints above
+        # WKWebView; a stage-attached overlay is invisible on some pages.
+        app_source = first['App.swift'].decode()
+        assert '.clipShape(AdaptiveChromePageCorners(radius:' in app_source
+        assert 'TabBar(browser: browser)\n                    .overlay(alignment: .bottom)' in app_source
+        assert 'AdaptiveChrome.roundedTop && !cards && browser.activeSplit == nil' in app_source
+        assert '!browser.prefs.splitView && fullscreenTab == nil' not in app_source
+
+        assert '.offset(y: Metrics.cardRadius)' in app_source
+        assert app_source.index('AdaptiveChromeTopCornerCutouts(browser: browser)') > app_source.index('TabBar(browser: browser)')
+        assert 'ROUND DEBUG' in first['AdaptiveChrome.swift'].decode()
+        assert 'if options.debug { Color.pink }' in first['AdaptiveChrome.swift'].decode()
+        assert 'struct AdaptiveChromeCornerCutoutShape: Shape' in first['AdaptiveChrome.swift'].decode()
+        assert 'AdaptiveChromeSurface(browser: browser, fallback: Palette.ground)' in first['AdaptiveChrome.swift'].decode()
+        assert '.padding(.top, chrome.height)' not in first['App.swift'].decode()
+        assert 'AdaptiveChromePageCorners: Shape' in first['AdaptiveChrome.swift'].decode()
+        assert 'browser.peekInFront' in first['AdaptiveChrome.swift'].decode()
+        assert 'Color.black.opacity(0.22)' in first['AdaptiveChrome.swift'].decode()
         assert 'updateChecksEnabled' in first['Updater.swift'].decode()
         assert 'Rebuild Search Adaptive' in first['Updater.swift'].decode()
         assert 'if AdaptiveChrome.installed' in first['Updater.swift'].decode()

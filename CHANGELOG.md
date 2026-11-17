@@ -1,5 +1,16 @@
 # Search Adaptive Kit — Changelog
 
+## v0.7 — Native settings & seamless page top corners
+
+- Fixed Peek-mode dimming: the native horizontal tab strip, its icons and buttons now get the same 22% black overlay as Search's page scrim; vertical sidebar controls follow the same dimming.
+- Hardened top-only rounded corners by clipping both the full SwiftUI page stage (including loading overlays) and its AppKit WebView host. The native corner mask refreshes on layout/window rehosting and respects flipped layer geometry.
+- No artificial outline, border, gutter or added shadow is introduced.
+- Rebuilt Appearance controls using Search's native `GroupBlock` → `Card` → `SettingRow` / `Rule` / `Switch` / `Pill` components instead of stock-blue SwiftUI toggles and free-floating buttons.
+- Split color controls and GitHub mod updater into two correctly styled settings groups, preserving the existing explicit build/install confirmations.
+- Removed the custom page-top outline, drawn border, and artificial 5-point gutter. Native AppKit clipping still rounds only the top corners when the horizontal tabbar is in use; same-color pages remain seamless.
+- Added documentation of the macOS Apple Passwords helper allowlist and passkey entitlements that prevent unsigned/ad-hoc local builds from inheriting official Search's integration.
+- Added regression tests to protect border-free rounding and Settings UI hooks.
+
 ## v0.6 — Settings and staged GitHub updates
 
 - Fix light-page search field: light input is distinctly brighter than the dimmed page; dark inputs keep their hue.
@@ -34,3 +45,22 @@
 ## v0.1
 
 - Initial adaptive chrome prototype.
+### v0.7 — top corner compositor fix
+- Browser page corner rounding is now enforced by two tiny corner cutouts rendered **above** WKWebView, filled with the toolbar's adaptive background. This avoids WebKit compositor layers bypassing ordinary SwiftUI and CALayer masks.
+- The cutouts use no border, gutter or shadow; their fill follows Search and Peek overlay dimming. Existing Peek shading remains unchanged.
+- Added idempotence and integration assertions for the cutout layer.
+
+### v0.7 — corner placement correction
+- Removed root-window corner overlay and its guessed `chrome.height` offset; cutouts are now attached directly to the page stage **before** SwiftUI padding and motion transforms.
+- A visible pink cutout diagnostic is available only with `debug-on`, making wrong placement and an old app build easy to identify.
+- Peek shading remains unchanged and is applied once above the page-attached cutouts.
+
+### v0.7 — TabBar-hosted cutouts (verified install, diagnostics invisible)
+- The installed SHA and all toggles were verified on the user's Mac; pink diagnostic corners were still absent, including on Search's internal Settings page.
+- **Root cause:** the stage overlays were drawn under the separate TabBar and could be hidden by WKWebView/internal pages. The cutouts are now overlaid on **TabBar itself**, offset exactly 10 pt below its bottom edge. No border or page gap.
+- In debug mode, pink corners plus a clear **ROUND DEBUG** marker must appear at the top edge of the page, providing an unambiguous geometry check. Peek implementation remains untouched.
+
+### v0.7 — root cause: splitView flag always true
+- Upstream Search `Preferences.splitView` defaults to `true` since its October 2026 Settings rework, even for a **single visible page**. Previous cutouts and stage clipping mistakenly required `!browser.prefs.splitView`, making them permanently disabled in the normal configuration. This explains why diagnostics showed no pink at all despite a verified installed SHA.
+- Page top rounding now uses **`browser.activeSplit == nil`** (no actual multi-page split) instead of the feature flag. Preserve TabBar-hosted rendering and original Peek behavior.
+- Added regression assertions to prevent this bug returning.
