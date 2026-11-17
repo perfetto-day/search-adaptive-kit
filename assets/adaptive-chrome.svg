@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 355" role="img" aria-labelledby="title desc">
+<title id="title">Search Adaptive — a browser flowing into its pages</title>
+<desc id="desc">Dark navy browser with a smooth teal gradient spreading from the page into the toolbar and tabs.</desc>
+<defs>
+<linearGradient id="chrome" x1="0" x2="1"><stop stop-color="#06181c"/><stop offset=".55" stop-color="#0a3336"/><stop offset="1" stop-color="#0c5756"/></linearGradient>
+<linearGradient id="page" x1="0" x2="1"><stop stop-color="#06171c"/><stop offset=".5" stop-color="#0b3437"/><stop offset="1" stop-color="#0c5855"/></linearGradient>
+<linearGradient id="shine" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#79fff2" stop-opacity=".32"/><stop offset="1" stop-color="#79fff2" stop-opacity="0"/></linearGradient>
+</defs>
+<rect width="1000" height="355" rx="22" fill="#091217"/>
+<rect x="24" y="22" width="952" height="311" rx="16" fill="#101b20" stroke="#2f4147" stroke-width="2"/>
+<path d="M40 22H960Q976 22 976 38V78H24V38Q24 22 40 22Z" fill="url(#chrome)"/>
+<circle cx="49" cy="50" r="6" fill="#ff6965"/><circle cx="71" cy="50" r="6" fill="#ffc455"/><circle cx="93" cy="50" r="6" fill="#42d884"/>
+<rect x="132" y="35" width="200" height="29" rx="9" fill="#ffffff" fill-opacity=".09"/>
+<text x="151" y="54" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#d8fffa">search-adaptive-kit</text>
+<rect x="24" y="78" width="224" height="255" rx="0" fill="#0b2227"/>
+<rect x="38" y="98" width="194" height="36" rx="9" fill="#1c4c50"/>
+<text x="57" y="120" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" fill="#c4fff6">●  Active tab</text>
+<text x="59" y="160" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#9cb5b7">◌  Another page</text>
+<text x="59" y="194" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#9cb5b7">◌  Pinned tab</text>
+<rect x="248" y="78" width="728" height="255" fill="url(#page)"/>
+<ellipse cx="842" cy="242" rx="220" ry="160" fill="url(#shine)"/>
+<path d="M248 78V333" stroke="#9df4ec" stroke-opacity=".10"/>
+<text x="304" y="151" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#b6e8e4">THE BROWSER BECOMES THE PAGE</text>
+<text x="304" y="211" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="700" fill="#effffc">Adaptive by design.</text>
+<text x="306" y="250" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#abd0cd">Seamless chrome. Native macOS. Zero browser forks.</text>
+</svg>

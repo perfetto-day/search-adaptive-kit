@@ -1,0 +1,31 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  patcher-and-color-detector:
+    name: Python / JavaScript / shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python patcher regression tests
+        run: python3 tests/patcher.test.py
+      - name: JavaScript color detector tests
+        run: node tests/color-detector.test.js
+      - name: Check shell syntax
+        run: bash -n update-and-build.sh toggle-mode.command
+      - name: Check Python syntax
+        run: python3 -m py_compile apply_mod.py tests/patcher.test.py

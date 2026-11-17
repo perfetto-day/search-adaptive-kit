@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+.AppleDouble
+
+# Build outputs
+.build/
+build/
+*.app/
+*.dmg
+*.zip
+DerivedData/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Local diagnostics and profiles
+*.log
+.env
+.env.*
