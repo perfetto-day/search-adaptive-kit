@@ -25,7 +25,11 @@ SOURCES = {
     }
 ''',
 'App.swift': '''let tint = (fullscreenTab != nil ? Color.black : cards ? Palette.frame : Palette.ground)
-            Omnibox(browser: browser, over: !(browser.active?.isBlank ?? true))''',
+            Omnibox(browser: browser, over: !(browser.active?.isBlank ?? true))
+            Page(tab: tab, corner: cards ? Metrics.cardRadius : 0, browser: browser)
+            stage
+                .modifier(CardEdge(on: cards && !browser.prefs.splitView))
+            .overlay { field }''',
 'Side.swift': '''struct SideBar: View {
         .environment(\\.greys, greys)
         .frame(width: width)
@@ -71,6 +75,14 @@ private struct TabPill: View, Equatable {
 /// The address, inside its own tab.
 ''',
 'Omnibox.swift': '''struct Omnibox: View {
+    init() {
+        self.typing = browser.typing
+        self.over = over
+    }
+    var body: some View {
+        Text("x")
+        .allowsHitTesting(browser.fieldShowing)
+    }
                         .fill(Palette.ground.opacity(0.74))
                         .fill(Palette.ground)
                         refused ? Color.red.opacity(0.35) : Palette.hairline,
@@ -112,11 +124,58 @@ struct AddressField: NSViewRepresentable {
 ''',
 'Updater.swift': '''    func checkIfDue(then say: @escaping (String) -> Void) {
         self.say = say
+        Swap.sweep()
+    }
+    private func checkIfDue() {
     }
     func checkByHand() {
     }
     func check(then done: @escaping (Release?) -> Void) {
+            done(found)
+            guard !installsOnItsOwn else { take(found); return }
     }
+    func install() {
+    }
+    private func take(_ release: Release) {
+    }
+''',
+ 'Settings.swift': '''    @ViewBuilder
+    private func section(_ page: Page) -> some View {
+        switch page {
+        case .keyboard:
+            groups(of: page)
+        default:
+            groups(of: page)
+        }
+    }
+''',
+'Stage.swift': '''struct Page: View {
+    var corner: CGFloat = 0
+    /// The window, for a tab showing one of Search's own pages
+    var browser: Browser?
+    func body() {
+        WebStage(page: !tab.isWeb || tab.asleep || tab.floating ? nil : tab.web, corner: corner)
+    }
+}
+struct WebStage: NSViewRepresentable {
+    let page: NSView?
+    var corner: CGFloat = 0
+    func updateNSView(_ view: StageView, context: Context) {
+        view.corner = corner
+        view.show(page)
+    }
+}
+final class StageView: NSView {
+    var corner: CGFloat = 0 {
+        didSet {
+            guard corner != oldValue else { return }
+            wantsLayer = true
+            layer?.cornerRadius = corner
+            layer?.cornerCurve = .continuous
+            layer?.masksToBounds = corner > 0
+        }
+    }
+}
 '''
 }
 
@@ -135,9 +194,19 @@ def check():
         apply(repo,KIT)
         first={p.name:p.read_bytes() for p in src.glob('*.swift')}
         assert 'AdaptiveChromeStyle' in first['Side.swift'].decode()
-        assert 'adaptive?.searchScrim' in first['Omnibox.swift'].decode()
+        assert 'actualAdaptive?.searchScrim' in first['Omnibox.swift'].decode()
+        assert 'AdaptiveChromeLive.shared' in first['Omnibox.swift'].decode()
         assert 'AdaptiveChromeSearchContext' in first['App.swift'].decode()
         assert 'AdaptiveChromePalette' in first['AdaptiveChrome.swift'].decode()
+        assert 'shade: AdaptiveChrome.parse(shade)' in first['Tab.swift'].decode()
+        assert 'Search Adaptive v0.6' in first['Tab.swift'].decode()
+        assert 'AdaptiveSettingsPanel(browser: browser)' in first['Settings.swift'].decode()
+        assert 'AdaptiveChromeTopShade' in first['App.swift'].decode()
+        assert 'AdaptiveSettings' in first['AdaptiveSettings.swift'].decode()
+        assert 'topCornersOnly' in first['Stage.swift'].decode()
+        assert 'layerMinXMaxYCorner' in first['Stage.swift'].decode()
+        assert 'updateChecksEnabled' in first['Updater.swift'].decode()
+        assert 'Rebuild Search Adaptive' in first['Updater.swift'].decode()
         assert 'if AdaptiveChrome.installed' in first['Updater.swift'].decode()
         apply(repo,KIT)
         second={p.name:p.read_bytes() for p in src.glob('*.swift')}
