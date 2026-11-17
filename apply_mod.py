@@ -138,6 +138,14 @@ def apply(repo: Path, kit: Path) -> None:
         s = one(s,
             '            .overlay { field }',
             """            .overlay(alignment: .top) {
+                if AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && !browser.prefs.splitView && fullscreenTab == nil {
+                    AdaptiveChromeTopCornerCutouts(browser: browser)
+                        .frame(height: Metrics.cardRadius)
+                        .padding(.top, chrome.height)
+                        .ignoresSafeArea()
+                }
+            }
+            .overlay(alignment: .top) {
                 if !browser.prefs.sidebar && fullscreenTab == nil {
                     AdaptiveChromeTopShade(browser: browser)
                         .frame(height: chrome.height)

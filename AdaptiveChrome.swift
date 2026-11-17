@@ -350,6 +350,66 @@ struct AdaptiveChromePageCorners: Shape {
     }
 }
 
+// Explicitly paint only the tiny pieces outside a rounded page corner.
+// WKWebView can draw in a separate compositor that ignores a parent mask.
+// These cutouts are overlaid *above* WebKit, using exactly the toolbar color;
+// there is no border, gutter, shadow or resizing of the page.
+struct AdaptiveChromeCornerCutoutShape: Shape {
+    var radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let r = min(radius, rect.width / 2, rect.height)
+        guard r > 0 else { return Path() }
+        // Cubic Bezier approximation of a quarter circle.
+        let k: CGFloat = 0.552284749831
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.minY))
+        path.addCurve(to: CGPoint(x: rect.minX, y: rect.minY + r),
+                      control1: CGPoint(x: rect.minX + r * (1 - k), y: rect.minY),
+                      control2: CGPoint(x: rect.minX, y: rect.minY + r * (1 - k)))
+        path.closeSubpath()
+        path.move(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + r))
+        path.addCurve(to: CGPoint(x: rect.maxX - r, y: rect.minY),
+                      control1: CGPoint(x: rect.maxX, y: rect.minY + r * (1 - k)),
+                      control2: CGPoint(x: rect.maxX - r * (1 - k), y: rect.minY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+@MainActor
+struct AdaptiveChromeTopCornerCutouts: View {
+    @ObservedObject var browser: Browser
+    @ObservedObject private var live: AdaptiveChromeLive
+    @ObservedObject private var options = AdaptivePreferences.shared
+    @Environment(\.colorScheme) private var scheme
+
+    init(browser: Browser) {
+        self.browser = browser
+        _live = ObservedObject(wrappedValue: AdaptiveChromeLive.shared(for: browser))
+    }
+
+    var body: some View {
+        ZStack {
+            AdaptiveChromeSurface(browser: browser, fallback: Palette.ground)
+            // Match all dynamic effects applied to the strip, including Peek.
+            (live.palette?.searchScrim ?? (scheme == .dark ? Color.black.opacity(0.60) : Color.white.opacity(0.60)))
+                .opacity(options.enabled && options.searchTint && browser.fieldShowing ? 1 : 0)
+            Color.black.opacity(0.22)
+                .opacity(options.enabled && browser.peekInFront ? 1 : 0)
+        }
+        .mask(AdaptiveChromeCornerCutoutShape(radius: Metrics.cardRadius))
+        .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
+        .animation(.easeInOut(duration: 0.18), value: browser.peekInFront)
+        .allowsHitTesting(false)
+        .onAppear { live.follow(browser.active, browser: browser) }
+        .onChange(of: browser.activeID) { _, _ in live.follow(browser.active, browser: browser) }
+    }
+}
+
 // Covers the *entire* top strip after Search has composed its tabs, icons and
 // buttons, but before the omnibox is presented. Unlike a TabBar background it
 // therefore shades tab glyphs and hover states as well as the strip itself.

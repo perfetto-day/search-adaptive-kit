@@ -45,3 +45,7 @@
 ## v0.1
 
 - Initial adaptive chrome prototype.
+### v0.7 — top corner compositor fix
+- Browser page corner rounding is now enforced by two tiny corner cutouts rendered **above** WKWebView, filled with the toolbar's adaptive background. This avoids WebKit compositor layers bypassing ordinary SwiftUI and CALayer masks.
+- The cutouts use no border, gutter or shadow; their fill follows Search and Peek overlay dimming. Existing Peek shading remains unchanged.
+- Added idempotence and integration assertions for the cutout layer.
