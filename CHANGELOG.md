@@ -59,3 +59,8 @@
 - The installed SHA and all toggles were verified on the user's Mac; pink diagnostic corners were still absent, including on Search's internal Settings page.
 - **Root cause:** the stage overlays were drawn under the separate TabBar and could be hidden by WKWebView/internal pages. The cutouts are now overlaid on **TabBar itself**, offset exactly 10 pt below its bottom edge. No border or page gap.
 - In debug mode, pink corners plus a clear **ROUND DEBUG** marker must appear at the top edge of the page, providing an unambiguous geometry check. Peek implementation remains untouched.
+
+### v0.7 — root cause: splitView flag always true
+- Upstream Search `Preferences.splitView` defaults to `true` since its October 2026 Settings rework, even for a **single visible page**. Previous cutouts and stage clipping mistakenly required `!browser.prefs.splitView`, making them permanently disabled in the normal configuration. This explains why diagnostics showed no pink at all despite a verified installed SHA.
+- Page top rounding now uses **`browser.activeSplit == nil`** (no actual multi-page split) instead of the feature flag. Preserve TabBar-hosted rendering and original Peek behavior.
+- Added regression assertions to prevent this bug returning.

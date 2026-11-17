@@ -153,7 +153,7 @@ def apply(repo: Path, kit: Path) -> None:
             """            stage
                 .modifier(CardEdge(on: cards && !browser.prefs.splitView))
                 .clipShape(AdaptiveChromePageCorners(radius:
-                    AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && !browser.prefs.splitView && fullscreenTab == nil
+                    AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && browser.activeSplit == nil && fullscreenTab == nil
                     ? Metrics.cardRadius : 0))""", app)
         changes['App.swift'] = s
     # Search's TabBar is explicitly drawn *after* the stage in the window's
@@ -166,7 +166,7 @@ def apply(repo: Path, kit: Path) -> None:
                     .transition(.move(edge: .top).combined(with: .opacity))''',
             '''                TabBar(browser: browser)
                     .overlay(alignment: .bottom) {
-                        if AdaptiveChrome.roundedTop && !cards && !browser.prefs.splitView {
+                        if AdaptiveChrome.roundedTop && !cards && browser.activeSplit == nil {
                             AdaptiveChromeTopCornerCutouts(browser: browser)
                                 .frame(height: Metrics.cardRadius)
                                 .offset(y: Metrics.cardRadius)

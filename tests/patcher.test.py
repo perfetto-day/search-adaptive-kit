@@ -227,6 +227,9 @@ def check():
         app_source = first['App.swift'].decode()
         assert '.clipShape(AdaptiveChromePageCorners(radius:' in app_source
         assert 'TabBar(browser: browser)\n                    .overlay(alignment: .bottom)' in app_source
+        assert 'AdaptiveChrome.roundedTop && !cards && browser.activeSplit == nil' in app_source
+        assert '!browser.prefs.splitView && fullscreenTab == nil' not in app_source
+
         assert '.offset(y: Metrics.cardRadius)' in app_source
         assert app_source.index('AdaptiveChromeTopCornerCutouts(browser: browser)') > app_source.index('TabBar(browser: browser)')
         assert 'ROUND DEBUG' in first['AdaptiveChrome.swift'].decode()
