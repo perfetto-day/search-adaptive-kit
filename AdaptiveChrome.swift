@@ -16,7 +16,7 @@ struct AdaptiveChromeReport: Equatable {
 @MainActor
 enum AdaptiveChrome {
     static let installed = true // Never install a stock Search binary over our app.
-    static let kitVersion = "v0.6"
+    static let kitVersion = "v0.7"
     static let colorTransition: Animation = .easeInOut(duration: 0.24)
     static let settingsKey = "adaptive.chrome.enabled"
     // Notifications about official Search releases are on by default. Never
@@ -322,20 +322,6 @@ struct AdaptiveChromeStyle: ViewModifier {
     }
 }
 
-
-// A faint, top-only outline makes the native rounding visible even when the
-// WebKit page has exactly the same background color as the adjacent toolbar.
-struct AdaptiveChromeTopEdge: Shape {
-    func path(in rect: CGRect) -> Path {
-        let radius: CGFloat = min(10, rect.width / 3)
-        var path = Path()
-        path.move(to: CGPoint(x: 0, y: radius))
-        path.addArc(tangent1End: CGPoint(x: 0, y: 0), tangent2End: CGPoint(x: radius, y: 0), radius: radius)
-        path.addLine(to: CGPoint(x: max(radius, rect.maxX - radius), y: 0))
-        path.addArc(tangent1End: CGPoint(x: rect.maxX, y: 0), tangent2End: CGPoint(x: rect.maxX, y: radius), radius: radius)
-        return path
-    }
-}
 
 // Covers the *entire* top strip after Search has composed its tabs, icons and
 // buttons, but before the omnibox is presented. Unlike a TabBar background it

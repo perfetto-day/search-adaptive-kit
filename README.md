@@ -35,7 +35,7 @@ This is **not** a Chrome / Safari extension. Search's interface is written in Sw
 | **Unified search overlay** | Keeps the last reliable page color; dims tabs/icons together and leaves a brighter input on light pages |
 | **Modal awareness** | Mirrors the actual RGB tint and alpha of common CSS modal backdrops |
 | **Pixel validation** | Uses limited, occasional WebKit snapshots when CSS sampling is ambiguous |
-| **Rounded page top** | Native AppKit corner clipping with a slight gutter and outline (optional) |\n| **Release notifications** | Optional official release checks (ON by default), never overwriting the patched app |\n| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
+| **Seamless rounded page top** | Native AppKit top-corner clipping, without a drawn border, gutter or additional shadow |\n| **Release notifications** | Optional official release checks (ON by default), never overwriting the patched app |\n| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
 
 The color detector is heuristic. Complex canvases, videos, gradients, custom overlays, translucent content and split-screen layouts may not match perfectly.
 
@@ -48,7 +48,7 @@ Clone **this** repository. Until PR #2 is merged, switch to the preview branch:
 ```bash
 git clone https://github.com/perfetto-day/search-adaptive-kit.git
 cd search-adaptive-kit
-git switch fix/v0.4-omnibox-modal-color
+git switch feat/v0.7-native-settings-seamless-corners
 ./update-and-build.sh
 ```
 
@@ -74,7 +74,7 @@ Official Search release **checks and in-app announcements are enabled by default
 
 ### In-browser settings & mod updates
 
-Go to `search://settings/appearance` → **Search Adaptive** to change adaptive coloring, search-overlay tint, top page rounding, diagnostics, and official release checks. These are the same preferences as `toggle-mode.command`. Reload already-open pages after enabling color detection.
+Go to `search://settings/appearance` → **Search Adaptive** for native-styled settings (the same cards, switches and controls as Search itself). The neighboring **Mod updates** group lets you check GitHub versions and stage builds. These are the same preferences as `toggle-mode.command`. Reload already-open pages after enabling color detection.
 
 For **optional GitHub-based mod updates**, click **Check GitHub branches and tags**, select a branch or tag and review its exact commit SHA, then choose **Download & Build**. The build runs locally in a dedicated managed checkout and is **never automatically installed**. After a successful build, confirm **Install & Restart**. A failed build leaves the currently installed app untouched. Selecting a remote revision and building it executes that revision's code on your Mac; only use trusted commits.
 
@@ -124,12 +124,18 @@ The tests cover patch application and JavaScript color heuristics. GitHub Action
 
 ## Project status
 
-**Experimental v0.6** — an independent prototype, not a signed, verified browser release. Expect rough edges. The separate app may use Search's existing application identity and profile settings: back up your browser data before the first run. Do not treat this as an isolated browser security profile.
+**Experimental v0.7** — an independent prototype, not a signed, verified browser release. Expect rough edges. The separate app may use Search's existing application identity and profile settings: back up your browser data before the first run. Do not treat this as an isolated browser security profile.
 
 Contributions and bug reports are welcome, especially reproducible color mismatches and upstream patch conflicts. See [Contributing](CONTRIBUTING.md).
 
 ## Credits & legal
 
 Based on [Search](https://github.com/driceroland/Search), developed by Office Commun, which is distributed under the [MIT License](https://github.com/driceroland/Search/blob/main/LICENSE). This repository contains an independent patch kit rather than a copy of the full upstream browser. See [LICENSE](LICENSE) and [third-party acknowledgments](THIRD_PARTY.md).
+
+### Apple Passwords and passkeys in local builds
+
+A self-built, ad-hoc-signed Search Adaptive app **does not inherit the official Search browser's code-signing identity or Apple permissions**. Apple's Passwords native helper may reject it, even when Apple Passwords works in the official Search release. Apple's browser helper uses a signed-browser allowlist; adding your own app requires a legitimate signed identity and Apple's inclusion process. Browser-wide passkeys require a separate restricted Apple entitlement. This cannot safely be enabled by changing a Swift flag or copying an entitlement.
+
+See [Apple's browser allowlist process](https://github.com/apple/password-manager-resources#how-apple-uses-web-browser-extension-distribution-information) and [Apple's passkeys entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.web-browser.public-key-credential). [Russian details](README_RU.md#apple-passwords-и-passkeys-в-собственной-сборке).
 
 **Not affiliated with, sponsored by, or endorsed by Search Browser or Office Commun.**

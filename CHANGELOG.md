@@ -1,5 +1,13 @@
 # Search Adaptive Kit — Changelog
 
+## v0.7 — Native settings & seamless page top corners
+
+- Rebuilt Appearance controls using Search's native `GroupBlock` → `Card` → `SettingRow` / `Rule` / `Switch` / `Pill` components instead of stock-blue SwiftUI toggles and free-floating buttons.
+- Split color controls and GitHub mod updater into two correctly styled settings groups, preserving the existing explicit build/install confirmations.
+- Removed the custom page-top outline, drawn border, and artificial 5-point gutter. Native AppKit clipping still rounds only the top corners when the horizontal tabbar is in use; same-color pages remain seamless.
+- Added documentation of the macOS Apple Passwords helper allowlist and passkey entitlements that prevent unsigned/ad-hoc local builds from inheriting official Search's integration.
+- Added regression tests to protect border-free rounding and Settings UI hooks.
+
 ## v0.6 — Settings and staged GitHub updates
 
 - Fix light-page search field: light input is distinctly brighter than the dimmed page; dark inputs keep their hue.

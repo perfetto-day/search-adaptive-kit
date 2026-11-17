@@ -1,10 +1,11 @@
-Search Adaptive v0.5 — local non-macOS validation
+Search Adaptive Kit v0.7 — local verification
 
-PASS: Python overlay fixture test (7 files, repeated application unchanged, safe stop on invalid upstream anchor)
-PASS: JS DOM detector (dark + accent; colored/light modal shade; gradient snapshot fallback)
-PASS: swiftc -frontend -parse AdaptiveChrome.swift (syntax only; not SwiftUI typechecking)
-PASS: bash -n update-and-build.sh toggle-mode.command
-PASS: Python source compilation
+PASS python3 tests/patcher.test.py — guarded application, idempotence, fail-closed handling on upstream changes, native Settings Card/SettingRow and border-free rounding anchors.
+PASS node tests/color-detector.test.js — dark-accent, modal, light/color overlays, gradient fallback.
+PASS bash -n update-and-build.sh toggle-mode.command mod-update.command
+PASS swiftc -frontend -parse AdaptiveChrome.swift
+PASS swiftc -frontend -parse AdaptiveSettings.swift
+PASS python3 -m py_compile apply_mod.py
 
-Not verified: full macOS/Xcode build, native WKWebView top-corner clipping in a live app,
-real new-tab Search palette with an actual website, update feed detection on macOS.
+macOS/Xcode full build: pending GitHub Actions CI check for PR #3.
+Apple Passwords and Passkeys: require proper app signing and Apple authorizations, not verified for ad-hoc local app.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Search Adaptive v0.6 overlay. Validates all anchors before touching files.
+"""Search Adaptive v0.7 overlay. Validates all anchors before touching files.
 
 Works against a clean upstream checkout; safe to run twice on the same checkout.
 The update script always restores upstream main first so a new release is never
@@ -32,7 +32,7 @@ def apply(repo: Path, kit: Path) -> None:
             '    @Published private(set) var cover: NSImage?',
             '''    @Published private(set) var cover: NSImage?
 
-    // Search Adaptive v0.6. Only the active Tab's report is drawn in the chrome.
+    // Search Adaptive v0.7. Only the active Tab's report is drawn in the chrome.
     @Published private(set) var adaptiveChromeReport = AdaptiveChromeReport()
     private let adaptiveChromeRelay = AdaptiveChromeRelay()
     private var adaptiveChromeGeneration = 0
@@ -145,20 +145,8 @@ def apply(repo: Path, kit: Path) -> None:
                 }
             }
             .overlay { field }""", app)
-        s = one(s,
-            """            stage
-                .modifier(CardEdge(on: cards && !browser.prefs.splitView))""",
-            """            stage
-                .modifier(CardEdge(on: cards && !browser.prefs.splitView))
-                .overlay(alignment: .top) {
-                    if AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && fullscreenTab == nil {
-                        AdaptiveChromeTopEdge()
-                            .stroke(Color.primary.opacity(0.14), lineWidth: 1)
-                            .frame(height: 12)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .padding(.top, AdaptiveChrome.roundedTop && !cards && !browser.prefs.sidebar && fullscreenTab == nil ? 5 : 0)""", app)
+        # Keep the stage flush with the tab strip. Native StageView already
+        # clips its top corners, so a drawn stroke/gutter would break seamless.
         changes['App.swift'] = s
     if 'topCornersOnly: AdaptiveChrome.roundedTop' not in s:
         s = one(s,
@@ -378,7 +366,10 @@ struct Omnibox: View {
             '''        case .appearance:
             groups(of: page)
             GroupBlock(title: "Search Adaptive", icon: "paintbrush.pointed") {
-                AdaptiveSettingsPanel(browser: browser)
+                Card { AdaptiveSettingsPanel(browser: browser) }
+            }
+            GroupBlock(title: "Mod updates", icon: "arrow.triangle.2.circlepath") {
+                Card { AdaptiveUpdateSettingsPanel() }
             }
         case .keyboard:
             groups(of: page)''', settings)
@@ -433,7 +424,7 @@ struct Omnibox: View {
             path.write_text(content, encoding='utf8')
     for module in modules:
         shutil.copy2(kit / module, root / module)
-    print('Applied Search Adaptive Chrome v0.6 (8 integration files + 2 modules).')
+    print('Applied Search Adaptive Chrome v0.7 (8 integration files + 2 modules).')
     print('Enable before launch: defaults write com.officecommun.search adaptive.chrome.enabled -bool true')
 
 
