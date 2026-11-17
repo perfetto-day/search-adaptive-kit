@@ -1,5 +1,15 @@
 # Search Adaptive Kit Changelog
 
+## v0.5 — shared search palette, update notifications, rounded page edge
+
+- One per-browser live color model for toolbar, sidebar and Omnibox; no independent palette race on new tabs.
+- Omnibox uses the shared palette directly to avoid a light neutral search field over a dark site.
+- Edge-to-edge web pages below horizontal tabs have **top-only rounded corners** using native `StageView.layer.maskedCorners` (no extra clipping on the whole SwiftUI window).
+- Restore background checks for official Search releases **ON by default**; report new versions through Search's in-app announcements.
+- Block all official binary replacement paths in the modified app; rebuild with the kit to actually update.
+- Add `updates-on` / `updates-off` in `toggle-mode.command` (manual update checking still possible).
+- Add a seventh upstream integration file (`Stage.swift`) and regression test assertions.
+
 ## v0.4 — Search overlay and modal color matching
 
 - Preserve the last valid page palette while showing the omnibox/new-tab field; avoid reverting to a white field over a dark page.

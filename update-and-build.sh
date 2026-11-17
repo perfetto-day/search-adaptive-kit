@@ -1,5 +1,5 @@
 #!/bin/bash
-# Search Adaptive v0.4: update only the dedicated checkout, patch, build, install.
+# Search Adaptive v0.5: update only the dedicated checkout, patch, build, install.
 set -euo pipefail
 KIT="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$HOME/Library/Application Support/SearchAdaptive"
@@ -52,7 +52,7 @@ git checkout -B adaptive-chrome origin/main
 git reset --hard origin/main
 python3 "$KIT/apply_mod.py" "$SOURCE"
 
-echo "Compiling Search Adaptive v0.4 (log: $ROOT/last-build.log)"
+echo "Compiling Search Adaptive v0.5 (log: $ROOT/last-build.log)"
 if ! ./build.sh release app 2>&1 | tee "$ROOT/last-build.log"; then
   echo "Build failed. Last log: $ROOT/last-build.log" >&2
   echo "Look for the FIRST compiler error, not follow-up messages." >&2
@@ -83,7 +83,9 @@ else
   exit 1
 fi
 printf '\nInstalled: %s\n' "$DEST"
-echo "The modified build does not use Search's official updater. Rerun this script when Search updates."
+echo "Search Adaptive checks for official Search releases by default, but never replaces its patched binary."
+echo "Disable official release checks: $KIT/toggle-mode.command updates-off"
+echo "To install an upstream update, rerun this build script."
 echo "Enable: $KIT/toggle-mode.command on"
 echo "Debug overlay: $KIT/toggle-mode.command debug-on"
 echo "Launch: open \"$DEST\""

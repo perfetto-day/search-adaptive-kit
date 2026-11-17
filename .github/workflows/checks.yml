@@ -29,3 +29,30 @@ jobs:
         run: bash -n update-and-build.sh toggle-mode.command
       - name: Check Python syntax
         run: python3 -m py_compile apply_mod.py tests/patcher.test.py
+
+  macos-build:
+    name: macOS / Xcode native build
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Xcode toolchain
+        run: |
+          xcodebuild -version
+          xcrun swift --version
+      - name: Clone upstream Search
+        run: git clone --depth 1 https://github.com/driceroland/Search.git "$RUNNER_TEMP/Search"
+      - name: Apply Search Adaptive patch
+        run: python3 apply_mod.py "$RUNNER_TEMP/Search"
+      - name: Compile patched native macOS app
+        working-directory: ${{ runner.temp }}/Search
+        run: |
+          set -o pipefail
+          ./build.sh release app 2>&1 | tee "$RUNNER_TEMP/search-adaptive-build.log"
+      - name: Upload compiler log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-compiler-log
+          path: ${{ runner.temp }}/search-adaptive-build.log
+          if-no-files-found: ignore

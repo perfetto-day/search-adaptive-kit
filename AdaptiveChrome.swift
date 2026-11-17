@@ -1,4 +1,4 @@
-// Search Adaptive Chrome v0.4 — single optional module, no upstream Design.swift edits.
+// Search Adaptive Chrome v0.5 — single optional module, no upstream Design.swift edits.
 // All color and modal-overlay information stays on the Mac.
 import AppKit
 import Combine
@@ -18,6 +18,12 @@ enum AdaptiveChrome {
     static let installed = true // Prevent the built-in updater replacing our app.
     static let colorTransition: Animation = .easeInOut(duration: 0.24)
     static let settingsKey = "adaptive.chrome.enabled"
+    // Notifications about official Search releases are on by default. Never
+    // install an official binary over the modified application.
+    static let updateChecksKey = "adaptive.chrome.updateChecks"
+    static var updateChecksEnabled: Bool {
+        Store.settings.object(forKey: updateChecksKey) as? Bool ?? true
+    }
     static var debug: Bool { Store.settings.bool(forKey: "adaptive.chrome.debug") }
     static var enabled: Bool { Store.settings.bool(forKey: settingsKey) }
 
@@ -160,10 +166,26 @@ extension EnvironmentValues {
 @MainActor
 final class AdaptiveChromeLive: ObservableObject {
     @Published private(set) var report = AdaptiveChromeReport()
-    // Each native chrome surface owns a separate observer. Share the last
-    // *valid* website color for this window so a newly-created blank tab and
-    // the short-lived Omnibox do not fall back to Search's white palette.
+    // A single observer per Browser is shared by the toolbar, sidebar and
+    // Omnibox. Separate StateObjects could race when the new-tab field opens:
+    // the toolbar would retain the dark page while the search field reset to
+    // Search's neutral light appearance.
+    private final class OwnerBox {
+        weak var browser: Browser?
+        init(_ browser: Browser) { self.browser = browser }
+    }
+    private static var models: [ObjectIdentifier: (owner: OwnerBox, live: AdaptiveChromeLive)] = [:]
     private static var remembered: [ObjectIdentifier: AdaptiveChromeReport] = [:]
+
+    static func shared(for browser: Browser) -> AdaptiveChromeLive {
+        models = models.filter { $0.value.owner.browser != nil }
+        let id = ObjectIdentifier(browser)
+        if let existing = models[id], existing.owner.browser === browser { return existing.live }
+        let live = AdaptiveChromeLive()
+        live.follow(browser.active, browser: browser)
+        models[id] = (OwnerBox(browser), live)
+        return live
+    }
     private weak var watched: Tab?
     private var browserID: ObjectIdentifier?
     private var subscription: AnyCancellable?
@@ -216,10 +238,17 @@ final class AdaptiveChromeLive: ObservableObject {
     var shade: Color { Color(nsColor: AdaptiveChrome.parse(report.shade) ?? NSColor.black) }
 }
 
+@MainActor
 struct AdaptiveChromeSurface: View {
     @ObservedObject var browser: Browser
     let fallback: Color
-    @StateObject private var live = AdaptiveChromeLive()
+    @ObservedObject private var live: AdaptiveChromeLive
+
+    init(browser: Browser, fallback: Color) {
+        self.browser = browser
+        self.fallback = fallback
+        _live = ObservedObject(wrappedValue: AdaptiveChromeLive.shared(for: browser))
+    }
 
     var body: some View {
         (live.palette?.background ?? fallback)
@@ -232,6 +261,7 @@ struct AdaptiveChromeSurface: View {
 
 // Stable modifier. It updates color, hover colors and contrast in-place.
 // The modal overlay is painted *over* native controls, as sites shade their own UI.
+@MainActor
 struct AdaptiveChromeStyle: ViewModifier {
     @ObservedObject var browser: Browser
     let greys: Greys
@@ -240,9 +270,10 @@ struct AdaptiveChromeStyle: ViewModifier {
         self.browser = browser
         self.greys = greys
         self.diagnostic = diagnostic
+        _live = ObservedObject(wrappedValue: AdaptiveChromeLive.shared(for: browser))
     }
     @Environment(\.colorScheme) private var inheritedScheme
-    @StateObject private var live = AdaptiveChromeLive()
+    @ObservedObject private var live: AdaptiveChromeLive
 
     func body(content: Content) -> some View {
         content
@@ -281,10 +312,16 @@ struct AdaptiveChromeStyle: ViewModifier {
 
 // The omnibox shares the active page palette, without shading the entire
 // overlay view. It must be mounted even when the page has no color yet.
+@MainActor
 struct AdaptiveChromeSearchContext: ViewModifier {
     @ObservedObject var browser: Browser
     @Environment(\.colorScheme) private var inheritedScheme
-    @StateObject private var live = AdaptiveChromeLive()
+    @ObservedObject private var live: AdaptiveChromeLive
+
+    init(browser: Browser) {
+        self.browser = browser
+        _live = ObservedObject(wrappedValue: AdaptiveChromeLive.shared(for: browser))
+    }
 
     func body(content: Content) -> some View {
         content

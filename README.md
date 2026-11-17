@@ -35,7 +35,7 @@ This is **not** a Chrome / Safari extension. Search's interface is written in Sw
 | **Unified search overlay** | Keeps the last reliable page color while the new-tab field appears; matches search scrim, native chrome and input |
 | **Modal awareness** | Mirrors the actual RGB tint and alpha of common CSS modal backdrops |
 | **Pixel validation** | Uses limited, occasional WebKit snapshots when CSS sampling is ambiguous |
-| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
+| **Rounded page top** | Clips the top corners of edge-to-edge WebViews under the horizontal tab strip with AppKit |\n| **Release notifications** | Checks official Search releases by default without silently replacing the modified build |\n| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
 
 The color detector is heuristic. Complex canvases, videos, gradients, custom overlays, translucent content and split-screen layouts may not match perfectly.
 
@@ -43,11 +43,12 @@ The color detector is heuristic. Complex canvases, videos, gradients, custom ove
 
 **Requirements:** macOS 14+, full **Xcode** (not just Command Line Tools), Git and Python 3. Node.js is optional for the detector tests.
 
-Clone **this** repository:
+Clone **this** repository. Until PR #2 is merged, switch to the preview branch:
 
 ```bash
 git clone https://github.com/perfetto-day/search-adaptive-kit.git
 cd search-adaptive-kit
+git switch fix/v0.4-omnibox-modal-color
 ./update-and-build.sh
 ```
 
@@ -69,7 +70,7 @@ git pull --ff-only
 ./update-and-build.sh
 ```
 
-Unlike upstream Search, the modified app does **not** use upstream's automatic binary updater: an upstream update would otherwise overwrite the patch.
+Official Search release **checks and in-app announcements are enabled by default**. The modified app will **not install** official Search binaries automatically because they would erase the adaptive modifications. Rebuild with `./update-and-build.sh` when a release is announced. You can turn background checks off; manual checks remain available.
 
 ### Controls
 
@@ -78,6 +79,8 @@ Unlike upstream Search, the modified app does **not** use upstream's automatic b
 ./toggle-mode.command off         # original Search palette
 ./toggle-mode.command debug-on    # show detected color / source / dimming
 ./toggle-mode.command debug-off
+./toggle-mode.command updates-on    # check for official Search releases (default)
+./toggle-mode.command updates-off   # disable background checks
 ./toggle-mode.command status
 ```
 
@@ -95,7 +98,7 @@ README_RU.md                   Full Russian installation / troubleshooting guide
 CHANGELOG.md                   Changes between prototypes
 ```
 
-The patcher modifies **six** upstream Swift sources: `Tab.swift`, `App.swift`, `Side.swift`, `TabBar.swift`, `Omnibox.swift`, and `Updater.swift`. It stops rather than guessing when an upstream code anchor changes.
+The patcher modifies **seven** upstream Swift sources: `Tab.swift`, `App.swift`, `Side.swift`, `TabBar.swift`, `Omnibox.swift`, `Updater.swift` and `Stage.swift`. It stops rather than guessing when an upstream code anchor changes.
 
 ## Tests
 
@@ -105,11 +108,11 @@ node tests/color-detector.test.js
 bash -n update-and-build.sh toggle-mode.command
 ```
 
-These checks exercise patch application and JavaScript color heuristics. They **do not prove a successful macOS app build**. Full Xcode compilation and real WebKit/SwiftUI visual testing are still required.
+The tests cover patch application and JavaScript color heuristics. GitHub Actions also attempts a macOS/Xcode build to expose native compiler errors, but even a green build **does not guarantee correct UI behavior**. Real WebKit/SwiftUI visual testing remains necessary.
 
 ## Project status
 
-**Experimental v0.4** — an independent prototype, not a signed, verified browser release. Expect rough edges. The separate app may use Search's existing application identity and profile settings: back up your browser data before the first run. Do not treat this as an isolated browser security profile.
+**Experimental v0.5** — an independent prototype, not a signed, verified browser release. Expect rough edges. The separate app may use Search's existing application identity and profile settings: back up your browser data before the first run. Do not treat this as an isolated browser security profile.
 
 Contributions and bug reports are welcome, especially reproducible color mismatches and upstream patch conflicts. See [Contributing](CONTRIBUTING.md).
 

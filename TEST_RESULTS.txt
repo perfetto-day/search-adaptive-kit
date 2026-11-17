@@ -1,13 +1,10 @@
-Search Adaptive Chrome v0.4 — non-macOS verification
+Search Adaptive v0.5 — local non-macOS validation
 
-PASS  Python overlay application: twice, no duplicates.
-PASS  Upstream-anchor mismatch: stops without partially writing files.
-PASS  The omnibox overlay, text/input color, and search context hooks were inserted.
-PASS  WebKit detector's JavaScript: dark body with bright accent, modal 42% scrim, tinted/light modal shades, complex-background snapshot fallback.
-PASS  swiftc -frontend -parse AdaptiveChrome.swift (syntax only).
-PASS  bash -n update-and-build.sh.
+PASS: Python overlay fixture test (7 files, repeated application unchanged, safe stop on invalid upstream anchor)
+PASS: JS DOM detector (dark + accent; colored/light modal shade; gradient snapshot fallback)
+PASS: swiftc -frontend -parse AdaptiveChrome.swift (syntax only; not SwiftUI typechecking)
+PASS: bash -n update-and-build.sh toggle-mode.command
+PASS: Python source compilation
 
-Not tested:
-- Full app build with Xcode on macOS.
-- Live WebKit/SwiftUI behavior and screenshots.
-- Pixel/snapshot performance on complex pages.
+Not verified: full macOS/Xcode build, native WKWebView top-corner clipping in a live app,
+real new-tab Search palette with an actual website, update feed detection on macOS.

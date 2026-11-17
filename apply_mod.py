@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Search Adaptive v0.4 overlay. Validates all anchors before touching files.
+"""Search Adaptive v0.5 overlay. Validates all anchors before touching files.
 
 Works against a clean upstream checkout; safe to run twice on the same checkout.
 The update script always restores upstream main first so a new release is never
@@ -20,7 +20,7 @@ def one(code: str, before: str, after: str, file: Path) -> str:
 
 def apply(repo: Path, kit: Path) -> None:
     root = repo / 'Sources' / 'Search'
-    paths = {n: root / n for n in ['Tab.swift', 'App.swift', 'Side.swift', 'TabBar.swift', 'Omnibox.swift', 'Updater.swift']}
+    paths = {n: root / n for n in ['Tab.swift', 'App.swift', 'Side.swift', 'TabBar.swift', 'Omnibox.swift', 'Updater.swift', 'Stage.swift']}
     for file in paths.values():
         if not file.is_file():
             raise RuntimeError(f"Not a Search source tree: missing {file}")
@@ -32,7 +32,7 @@ def apply(repo: Path, kit: Path) -> None:
             '    @Published private(set) var cover: NSImage?',
             '''    @Published private(set) var cover: NSImage?
 
-    // Search Adaptive v0.4. Only the active Tab's report is drawn in the chrome.
+    // Search Adaptive v0.5. Only the active Tab's report is drawn in the chrome.
     @Published private(set) var adaptiveChromeReport = AdaptiveChromeReport()
     private let adaptiveChromeRelay = AdaptiveChromeRelay()
     private var adaptiveChromeGeneration = 0
@@ -134,6 +134,60 @@ def apply(repo: Path, kit: Path) -> None:
             """            Omnibox(browser: browser, over: !(browser.active?.isBlank ?? true))
                 .modifier(AdaptiveChromeSearchContext(browser: browser))""", app)
         changes['App.swift'] = s
+    if 'topCornersOnly: !cards && !browser.prefs.sidebar' not in s:
+        s = one(s,
+            'Page(tab: tab, corner: cards ? Metrics.cardRadius : 0, browser: browser)',
+            '''Page(tab: tab,
+                 corner: cards || (!browser.prefs.sidebar && fullscreenTab == nil) ? Metrics.cardRadius : 0,
+                 topCornersOnly: !cards && !browser.prefs.sidebar && fullscreenTab == nil,
+                 browser: browser)''', app)
+        changes['App.swift'] = s
+
+    # Native AppKit rounding: SwiftUI-only clipping can leave WKWebView square.
+    # Preserve the card's four-corner behavior and round only the top corners
+    # of an edge-to-edge page beneath the horizontal tab bar.
+    stage = paths['Stage.swift']; s = changes['Stage.swift']
+    if 'topCornersOnly: Bool' not in s:
+        s = one(s,
+            '    var corner: CGFloat = 0\n    /// The window, for a tab showing',
+            '    var corner: CGFloat = 0\n    var topCornersOnly: Bool = false\n    /// The window, for a tab showing', stage)
+        s = one(s,
+            'WebStage(page: !tab.isWeb || tab.asleep || tab.floating ? nil : tab.web, corner: corner)',
+            'WebStage(page: !tab.isWeb || tab.asleep || tab.floating ? nil : tab.web, corner: corner, topCornersOnly: topCornersOnly)', stage)
+        s = one(s,
+            'struct WebStage: NSViewRepresentable {\n    let page: NSView?\n    var corner: CGFloat = 0',
+            'struct WebStage: NSViewRepresentable {\n    let page: NSView?\n    var corner: CGFloat = 0\n    var topCornersOnly: Bool = false', stage)
+        s = one(s,
+            '        view.corner = corner\n        view.show(page)',
+            '        view.topCornersOnly = topCornersOnly\n        view.corner = corner\n        view.show(page)', stage)
+        s = one(s,
+            '''    var corner: CGFloat = 0 {
+        didSet {
+            guard corner != oldValue else { return }
+            wantsLayer = true
+            layer?.cornerRadius = corner
+            layer?.cornerCurve = .continuous
+            layer?.masksToBounds = corner > 0
+        }
+    }''',
+            '''    var corner: CGFloat = 0 {
+        didSet { if corner != oldValue { updateCornerMask() } }
+    }
+    var topCornersOnly = false {
+        didSet { if topCornersOnly != oldValue { updateCornerMask() } }
+    }
+
+    private func updateCornerMask() {
+        wantsLayer = true
+        layer?.cornerRadius = corner
+        layer?.cornerCurve = .continuous
+        // Core Animation uses bottom-left coordinates: MaxY is the page top.
+        layer?.maskedCorners = topCornersOnly
+            ? [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+            : [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        layer?.masksToBounds = corner > 0
+    }''', stage)
+        changes['Stage.swift'] = s
 
     side = paths['Side.swift']; s = changes['Side.swift']
     if 'AdaptiveChromeStyle(browser: browser, greys: greys)' not in s:
@@ -230,21 +284,34 @@ def apply(repo: Path, kit: Path) -> None:
     # site-independent white scrim. The search context keeps AppKit text, the
     # SwiftUI field, and the page/topbar shade consistent with the site.
     omnibox = paths['Omnibox.swift']; s = changes['Omnibox.swift']
-    if 'adaptive?.searchScrim' not in s:
+    if 'actualAdaptive?.searchScrim' not in s:
         s = one(s, 'struct Omnibox: View {',
-            'struct Omnibox: View {\n    @Environment(\\.adaptiveChromePalette) private var adaptive', omnibox)
+            '''@MainActor
+struct Omnibox: View {
+    @Environment(\\.adaptiveChromePalette) private var adaptive
+    @Environment(\\.colorScheme) private var inheritedScheme
+    @ObservedObject private var adaptiveLive: AdaptiveChromeLive
+    private var actualAdaptive: AdaptiveChromePalette? { adaptiveLive.palette ?? adaptive }''', omnibox)
+        s = one(s,
+            '        self.typing = browser.typing\n        self.over = over',
+            '        self.typing = browser.typing\n        _adaptiveLive = ObservedObject(wrappedValue: AdaptiveChromeLive.shared(for: browser))\n        self.over = over', omnibox)
+        s = one(s,
+            '        .allowsHitTesting(browser.fieldShowing)',
+            '''        .allowsHitTesting(browser.fieldShowing)
+        .environment(\\.adaptiveChromePalette, actualAdaptive)
+        .environment(\\.colorScheme, actualAdaptive.map { $0.dark ? ColorScheme.dark : .light } ?? inheritedScheme)''', omnibox)
         s = one(s,
             '                        .fill(Palette.ground.opacity(0.74))',
-            '                        .fill(adaptive?.searchScrim ?? Palette.ground.opacity(0.74))', omnibox)
+            '                        .fill(actualAdaptive?.searchScrim ?? Palette.ground.opacity(0.74))', omnibox)
         s = one(s,
             '                        .fill(Palette.ground)',
-            '                        .fill(adaptive?.searchField ?? Palette.ground)', omnibox)
+            '                        .fill(actualAdaptive?.searchField ?? Palette.ground)', omnibox)
         s = one(s,
             '                        refused ? Color.red.opacity(0.35) : Palette.hairline,',
-            '                        refused ? Color.red.opacity(0.35) : (adaptive?.hairline ?? Palette.hairline),', omnibox)
+            '                        refused ? Color.red.opacity(0.35) : (actualAdaptive?.hairline ?? Palette.hairline),', omnibox)
         s = one(s,
             '        .background(Palette.ground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))',
-            '        .background(adaptive?.searchField ?? Palette.ground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))', omnibox)
+            '        .background(actualAdaptive?.searchField ?? Palette.ground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))', omnibox)
         s = one(s,
             'struct AddressField: NSViewRepresentable {',
             'struct AddressField: NSViewRepresentable {\n    @Environment(\\.adaptiveChromePalette) private var adaptive', omnibox)
@@ -277,18 +344,42 @@ def apply(repo: Path, kit: Path) -> None:
         s = front + divider + tail
         changes['Omnibox.swift'] = s
 
-    # Never install an official update over our modified .app.
+    # Keep upstream release checks on by default; block binary replacement.
     updater = paths['Updater.swift']; s = changes['Updater.swift']
-    if 'if AdaptiveChrome.installed' not in s:
+    if 'AdaptiveChrome.updateChecksEnabled' not in s:
         s = one(s,
-            '    func checkIfDue(then say: @escaping (String) -> Void) {',
-            '    func checkIfDue(then say: @escaping (String) -> Void) {\n        self.say = say\n        if AdaptiveChrome.installed { return }', updater)
+            '        self.say = say\n        Swap.sweep()',
+            '        self.say = say\n        if AdaptiveChrome.installed && !AdaptiveChrome.updateChecksEnabled { return }\n        Swap.sweep()', updater)
+        s = one(s,
+            '    private func checkIfDue() {',
+            '    private func checkIfDue() {\n        if AdaptiveChrome.installed && !AdaptiveChrome.updateChecksEnabled { return }', updater)
+        s = one(s,
+            '            done(found)\n            guard !installsOnItsOwn else { take(found); return }',
+            '''            done(found)
+            if AdaptiveChrome.installed {
+                if case .waiting(let known) = stage, known == found { return }
+                stage = .waiting(found)
+                say?("Search \\(found.version) is available — rebuild Search Adaptive with update-and-build.sh")
+                return
+            }
+            guard !installsOnItsOwn else { take(found); return }''', updater)
         s = one(s,
             '    func checkByHand() {',
-            '    func checkByHand() {\n        if AdaptiveChrome.installed {\n            say?("Search Adaptive updates via update-and-build.sh, not the official updater")\n            return\n        }', updater)
+            '''    func checkByHand() {
+        if AdaptiveChrome.installed, case .waiting(let known) = stage {
+            say?("Search \\(known.version) is available — rebuild with update-and-build.sh")
+            return
+        }''', updater)
         s = one(s,
-            '    func check(then done: @escaping (Release?) -> Void) {',
-            '    func check(then done: @escaping (Release?) -> Void) {\n        if AdaptiveChrome.installed { done(nil); return }', updater)
+            '    func install() {',
+            '''    func install() {
+        if AdaptiveChrome.installed {
+            say?("Rebuild Search Adaptive using update-and-build.sh to preserve adaptive colors")
+            return
+        }''', updater)
+        s = one(s,
+            '    private func take(_ release: Release) {',
+            '    private func take(_ release: Release) {\n        if AdaptiveChrome.installed { return }', updater)
         changes['Updater.swift'] = s
 
     shipped = kit / 'AdaptiveChrome.swift'
@@ -300,7 +391,7 @@ def apply(repo: Path, kit: Path) -> None:
         if path.read_text(encoding='utf8') != content:
             path.write_text(content, encoding='utf8')
     shutil.copy2(shipped, root / 'AdaptiveChrome.swift')
-    print('Applied Search Adaptive Chrome v0.4 (6 integration files + module).')
+    print('Applied Search Adaptive Chrome v0.5 (7 integration files + module).')
     print('Enable before launch: defaults write com.officecommun.search adaptive.chrome.enabled -bool true')
 
 
