@@ -330,9 +330,9 @@ struct AdaptiveChromeTopEdge: Shape {
         let radius: CGFloat = min(10, rect.width / 3)
         var path = Path()
         path.move(to: CGPoint(x: 0, y: radius))
-        path.addArc(tangent1: CGPoint(x: 0, y: 0), tangent2: CGPoint(x: radius, y: 0), radius: radius)
+        path.addArc(tangent1End: CGPoint(x: 0, y: 0), tangent2End: CGPoint(x: radius, y: 0), radius: radius)
         path.addLine(to: CGPoint(x: max(radius, rect.maxX - radius), y: 0))
-        path.addArc(tangent1: CGPoint(x: rect.maxX, y: 0), tangent2: CGPoint(x: rect.maxX, y: radius), radius: radius)
+        path.addArc(tangent1End: CGPoint(x: rect.maxX, y: 0), tangent2End: CGPoint(x: rect.maxX, y: radius), radius: radius)
         return path
     }
 }
