@@ -33,7 +33,7 @@ async function evaluate(options) {
   const root=new Element(options.root || 'transparent');
   const body=new Element(options.body || 'transparent',{parent:root,backgroundImage:options.gradient?'linear-gradient(red,blue)':'none'});
   const accent=new Element('#00cfcc',{parent:body,accent:true});
-  const overlay=new Element('rgba(0, 0, 0, 0.42)',{parent:body,overlay:true});
+  const overlay=new Element(options.overlayColor || 'rgba(0, 0, 0, 0.42)',{parent:body,overlay:true});
   const document={
     documentElement:root, body,
     createElement(tag) {
@@ -82,9 +82,17 @@ async function evaluate(options) {
   const modal=await evaluate({body:'#ffffff',modal:true});
   assert.strictEqual(modal.color,'#ffffff',`Overlay affected base: ${JSON.stringify(modal)}`);
   assert(Math.abs(modal.dim-0.42)<0.02,`Overlay not detected: ${JSON.stringify(modal)}`);
+  assert.strictEqual(modal.shade,'#000000');
+  const tinted=await evaluate({body:'#fdfdfd',modal:true,overlayColor:'rgba(30, 45, 60, 0.4)'});
+  assert.strictEqual(tinted.shade,'#1e2d3c',`Colored overlay shade lost: ${JSON.stringify(tinted)}`);
+  assert(Math.abs(tinted.dim-0.4)<0.02,`Tinted overlay alpha lost: ${JSON.stringify(tinted)}`);
+  const light=await evaluate({body:'#0c1418',modal:true,overlayColor:'rgba(245, 250, 255, 0.32)'});
+  assert.strictEqual(light.shade,'#f5faff',`Light overlay shade lost: ${JSON.stringify(light)}`);
+  assert(Math.abs(light.dim-0.32)<0.02,`Light overlay alpha lost: ${JSON.stringify(light)}`);
   const gradient=await evaluate({gradient:true});
   assert(gradient.snapshot,`Expected bounded pixel fallback: ${JSON.stringify(gradient)}`);
   console.log('PASS: dark + accent:',dark);
   console.log('PASS: modal scrim:',modal);
+  console.log('PASS: colored and light overlays:',tinted,light);
   console.log('PASS: gradient snapshot fallback:',gradient);
 })().catch(error=>{console.error(error);process.exitCode=1;});

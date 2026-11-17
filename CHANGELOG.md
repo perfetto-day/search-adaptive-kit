@@ -1,5 +1,13 @@
 # Search Adaptive Kit Changelog
 
+## v0.4 — Search overlay and modal color matching
+
+- Preserve the last valid page palette while showing the omnibox/new-tab field; avoid reverting to a white field over a dark page.
+- Keep the search scrim on the native toolbar and the WebView in sync, including when the address bar is opened for a new tab.
+- Use the actual CSS modal-backdrop RGB shade rather than assuming every backdrop is black. Supports light overlays too.
+- Refresh the shared browser-color cache when the search field opens/closes; keep stale modal dimming out of the cache.
+- Extend detector tests to cover RGB-colored modal overlays and light overlay shades.
+
 ## v0.3 — Search and smooth chrome
 
 - Smooth 240 ms color transitions when a site's theme/background changes.

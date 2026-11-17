@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Search Adaptive v0.3 overlay. Validates all anchors before touching files.
+"""Search Adaptive v0.4 overlay. Validates all anchors before touching files.
 
 Works against a clean upstream checkout; safe to run twice on the same checkout.
 The update script always restores upstream main first so a new release is never
@@ -32,7 +32,7 @@ def apply(repo: Path, kit: Path) -> None:
             '    @Published private(set) var cover: NSImage?',
             '''    @Published private(set) var cover: NSImage?
 
-    // Search Adaptive v0.3. Only the active Tab's report is drawn in the chrome.
+    // Search Adaptive v0.4. Only the active Tab's report is drawn in the chrome.
     @Published private(set) var adaptiveChromeReport = AdaptiveChromeReport()
     private let adaptiveChromeRelay = AdaptiveChromeRelay()
     private var adaptiveChromeGeneration = 0
@@ -43,9 +43,11 @@ def apply(repo: Path, kit: Path) -> None:
     func receiveAdaptiveChrome(_ body: [String: Any]) {
         let proposed = (body["color"] as? String ?? "").lowercased()
         let dim = min(0.85, max(0, body["dim"] as? Double ?? 0))
+        let shade = (body["shade"] as? String ?? "#000000").lowercased()
         let parsed = AdaptiveChrome.parse(proposed) == nil ? "" : proposed
         let color = parsed.isEmpty && dim > 0 ? adaptiveChromeReport.hex : parsed
         let next = AdaptiveChromeReport(hex: color, dim: dim,
+                                        shade: AdaptiveChrome.parse(shade) == nil ? "#000000" : shade,
                                         source: body["source"] as? String ?? "dom",
                                         snapshot: body["snapshot"] as? Bool ?? false)
         adaptiveChromeHasReport = true
@@ -298,7 +300,7 @@ def apply(repo: Path, kit: Path) -> None:
         if path.read_text(encoding='utf8') != content:
             path.write_text(content, encoding='utf8')
     shutil.copy2(shipped, root / 'AdaptiveChrome.swift')
-    print('Applied Search Adaptive Chrome v0.3 (6 integration files + module).')
+    print('Applied Search Adaptive Chrome v0.4 (6 integration files + module).')
     print('Enable before launch: defaults write com.officecommun.search adaptive.chrome.enabled -bool true')
 
 

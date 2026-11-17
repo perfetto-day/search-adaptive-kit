@@ -138,6 +138,8 @@ def check():
         assert 'adaptive?.searchScrim' in first['Omnibox.swift'].decode()
         assert 'AdaptiveChromeSearchContext' in first['App.swift'].decode()
         assert 'AdaptiveChromePalette' in first['AdaptiveChrome.swift'].decode()
+        assert 'shade: AdaptiveChrome.parse(shade)' in first['Tab.swift'].decode()
+        assert 'Search Adaptive v0.4' in first['Tab.swift'].decode()
         assert 'if AdaptiveChrome.installed' in first['Updater.swift'].decode()
         apply(repo,KIT)
         second={p.name:p.read_bytes() for p in src.glob('*.swift')}

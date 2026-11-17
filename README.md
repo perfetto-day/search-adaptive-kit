@@ -32,8 +32,8 @@ This is **not** a Chrome / Safari extension. Search's interface is written in Sw
 | **Adaptive toolbar** | Estimates the top-of-page background, prioritizing visible colors over page accent metadata |
 | **Tinted tabs** | Uses hue-preserving HSL lightness adjustments for active, hovered and pinned tabs |
 | **Smooth transitions** | Animates compatible color changes (~240 ms), without animating toolbar position |
-| **Unified search overlay** | Applies page-aware shading to the search scrim, native chrome and search field |
-| **Modal awareness** | Detects common modal backdrops and approximates their dimming |
+| **Unified search overlay** | Keeps the last reliable page color while the new-tab field appears; matches search scrim, native chrome and input |
+| **Modal awareness** | Mirrors the actual RGB tint and alpha of common CSS modal backdrops |
 | **Pixel validation** | Uses limited, occasional WebKit snapshots when CSS sampling is ambiguous |
 | **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
 
@@ -109,7 +109,7 @@ These checks exercise patch application and JavaScript color heuristics. They **
 
 ## Project status
 
-**Experimental v0.3** — an independent prototype, not a signed, verified browser release. Expect rough edges. The separate app may use Search's existing application identity and profile settings: back up your browser data before the first run. Do not treat this as an isolated browser security profile.
+**Experimental v0.4** — an independent prototype, not a signed, verified browser release. Expect rough edges. The separate app may use Search's existing application identity and profile settings: back up your browser data before the first run. Do not treat this as an isolated browser security profile.
 
 Contributions and bug reports are welcome, especially reproducible color mismatches and upstream patch conflicts. See [Contributing](CONTRIBUTING.md).
 

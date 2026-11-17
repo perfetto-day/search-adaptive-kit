@@ -1,4 +1,4 @@
-// Search Adaptive Chrome v0.3 — single optional module, no upstream Design.swift edits.
+// Search Adaptive Chrome v0.4 — single optional module, no upstream Design.swift edits.
 // All color and modal-overlay information stays on the Mac.
 import AppKit
 import Combine
@@ -8,6 +8,7 @@ import WebKit
 struct AdaptiveChromeReport: Equatable {
     var hex: String = ""
     var dim: Double = 0
+    var shade: String = "#000000"
     var source: String = "none"
     var snapshot: Bool = false
 }
@@ -159,18 +160,52 @@ extension EnvironmentValues {
 @MainActor
 final class AdaptiveChromeLive: ObservableObject {
     @Published private(set) var report = AdaptiveChromeReport()
+    // Each native chrome surface owns a separate observer. Share the last
+    // *valid* website color for this window so a newly-created blank tab and
+    // the short-lived Omnibox do not fall back to Search's white palette.
+    private static var remembered: [ObjectIdentifier: AdaptiveChromeReport] = [:]
     private weak var watched: Tab?
+    private var browserID: ObjectIdentifier?
     private var subscription: AnyCancellable?
 
-    func follow(_ tab: Tab?) {
-        guard watched !== tab else { return }
-        subscription = nil
-        watched = tab
-        report = tab?.adaptiveChromeReport ?? AdaptiveChromeReport()
-        subscription = tab?.$adaptiveChromeReport.dropFirst().sink { [weak self] next in
-            guard let self else { return }
-            withAnimation(AdaptiveChrome.colorTransition) { self.report = next }
+    func follow(_ tab: Tab?, browser: Browser) {
+        let id = ObjectIdentifier(browser)
+        let changedTab = watched !== tab || browserID != id
+        if changedTab {
+            subscription = nil
+            watched = tab
+            browserID = id
         }
+        // Retain only the background: an old modal must NOT continue shading
+        // the new-tab search or the new page.
+        let current = tab?.adaptiveChromeReport ?? AdaptiveChromeReport()
+        if !current.hex.isEmpty {
+            Self.remembered[id] = AdaptiveChromeReport(hex: current.hex, source: "remembered")
+        }
+        let next: AdaptiveChromeReport
+        if !current.hex.isEmpty { next = current }
+        else if browser.fieldShowing, let cached = Self.remembered[id] { next = cached }
+        else { next = current }
+        if report != next { withAnimation(AdaptiveChrome.colorTransition) { report = next } }
+
+        if changedTab {
+            subscription = tab?.$adaptiveChromeReport.dropFirst().sink { [weak self, weak browser] next in
+                guard let self, let browser else { return }
+                self.followReport(next, browser: browser)
+            }
+        }
+    }
+
+    private func followReport(_ next: AdaptiveChromeReport, browser: Browser) {
+        let id = ObjectIdentifier(browser)
+        if !next.hex.isEmpty {
+            Self.remembered[id] = AdaptiveChromeReport(hex: next.hex, source: "remembered")
+        }
+        let resolved: AdaptiveChromeReport
+        if !next.hex.isEmpty { resolved = next }
+        else if browser.fieldShowing, let cached = Self.remembered[id] { resolved = cached }
+        else { resolved = next }
+        if report != resolved { withAnimation(AdaptiveChrome.colorTransition) { report = resolved } }
     }
 
     var palette: AdaptiveChromePalette? {
@@ -178,6 +213,7 @@ final class AdaptiveChromeLive: ObservableObject {
         return AdaptiveChromePalette(color)
     }
     var dim: Double { AdaptiveChrome.enabled ? min(0.85, max(0, report.dim)) : 0 }
+    var shade: Color { Color(nsColor: AdaptiveChrome.parse(report.shade) ?? NSColor.black) }
 }
 
 struct AdaptiveChromeSurface: View {
@@ -188,8 +224,9 @@ struct AdaptiveChromeSurface: View {
     var body: some View {
         (live.palette?.background ?? fallback)
             .animation(AdaptiveChrome.colorTransition, value: live.report.hex)
-            .onAppear { live.follow(browser.active) }
-            .onChange(of: browser.activeID) { _, _ in live.follow(browser.active) }
+            .onAppear { live.follow(browser.active, browser: browser) }
+            .onChange(of: browser.activeID) { _, _ in live.follow(browser.active, browser: browser) }
+            .onChange(of: browser.fieldShowing) { _, _ in live.follow(browser.active, browser: browser) }
     }
 }
 
@@ -214,14 +251,14 @@ struct AdaptiveChromeStyle: ViewModifier {
             .environment(\.colorScheme, live.palette.map { $0.dark ? ColorScheme.dark : .light } ?? inheritedScheme)
             .overlay {
                 if live.dim > 0.01 {
-                    Color.black.opacity(live.dim).allowsHitTesting(false)
+                    live.shade.opacity(live.dim).allowsHitTesting(false)
                 }
             }
             .overlay {
                 // Search already shades the WebView; match that exact tint on
                 // the native chrome too. Keep the overlay mounted for a fade.
-                (live.palette?.searchScrim ?? Color.black.opacity(0.42))
-                    .opacity(live.palette != nil && browser.fieldShowing && !(browser.active?.isBlank ?? true) ? 1 : 0)
+                (live.palette?.searchScrim ?? (inheritedScheme == .dark ? Color.black.opacity(0.60) : Color.white.opacity(0.60)))
+                    .opacity(live.palette != nil && browser.fieldShowing ? 1 : 0)
                     .animation(.easeInOut(duration: 0.20), value: browser.fieldShowing)
                     .allowsHitTesting(false)
             }
@@ -236,8 +273,9 @@ struct AdaptiveChromeStyle: ViewModifier {
                         .allowsHitTesting(false)
                 }
             }
-            .onAppear { live.follow(browser.active) }
-            .onChange(of: browser.activeID) { _, _ in live.follow(browser.active) }
+            .onAppear { live.follow(browser.active, browser: browser) }
+            .onChange(of: browser.activeID) { _, _ in live.follow(browser.active, browser: browser) }
+            .onChange(of: browser.fieldShowing) { _, _ in live.follow(browser.active, browser: browser) }
     }
 }
 
@@ -252,8 +290,9 @@ struct AdaptiveChromeSearchContext: ViewModifier {
         content
             .environment(\.adaptiveChromePalette, live.palette)
             .environment(\.colorScheme, live.palette.map { $0.dark ? ColorScheme.dark : .light } ?? inheritedScheme)
-            .onAppear { live.follow(browser.active) }
-            .onChange(of: browser.activeID) { _, _ in live.follow(browser.active) }
+            .onAppear { live.follow(browser.active, browser: browser) }
+            .onChange(of: browser.activeID) { _, _ in live.follow(browser.active, browser: browser) }
+            .onChange(of: browser.fieldShowing) { _, _ in live.follow(browser.active, browser: browser) }
     }
 }
 
@@ -309,7 +348,7 @@ final class AdaptiveChromeRelay: NSObject, WKScriptMessageHandler {
         return [0,1,2].map(i => (top[i]*ta + behind[i]*ba*(1-ta))/a).concat(a);
       }
       function backdrop() {
-        let alpha = 0;
+        let alpha = 0, color = '#000000';
         const w = innerWidth, h = innerHeight;
         const list = new Set();
         const pts = [[5,5],[w-5,5],[5,h-5],[w-5,h-5],[w/2,h/2],[w/2,8]];
@@ -320,9 +359,10 @@ final class AdaptiveChromeRelay: NSObject, WKScriptMessageHandler {
             const c = rgba(s.backgroundColor);
             if (s.position === 'fixed' && r.width >= w*0.88 && r.height >= h*0.85 &&
                 c && c[3]*Number(s.opacity) > .07 && c[3]*Number(s.opacity) < .91 &&
-                (c[0]+c[1]+c[2]) < 360) {
+                s.pointerEvents !== 'none') {
               list.add(el);
-              alpha = Math.max(alpha, c[3]*Number(s.opacity));
+              const amount = c[3]*Number(s.opacity);
+              if (amount > alpha) { alpha = amount; color = hex(c); }
             }
           }
         }
@@ -330,10 +370,10 @@ final class AdaptiveChromeRelay: NSObject, WKScriptMessageHandler {
           try {
             if (!dialog.matches(':modal')) continue;
             const c = rgba(getComputedStyle(dialog,'::backdrop').backgroundColor);
-            if (c && (c[0]+c[1]+c[2]) < 360) alpha = Math.max(alpha, c[3]);
+            if (c && c[3] > alpha) { alpha = c[3]; color = hex(c); }
           } catch (_) {}
         }
-        return {list, alpha: Math.min(0.78, alpha)};
+        return {list, alpha: Math.min(0.78, alpha), color};
       }
       function sampleAt(x, y, skipped) {
         let stack = document.elementsFromPoint(x,y);
@@ -372,16 +412,16 @@ final class AdaptiveChromeRelay: NSObject, WKScriptMessageHandler {
           if (similar.length > votes) { best = similar; votes = similar.length; }
         }
         if (best && votes >= 5 && votes >= samples.length * .38) {
-          return {color:hex([0,1,2].map(i => best.reduce((a,c)=>a+c[i],0)/best.length)),dim:shaded.alpha,source:'dom',snapshot:shaded.alpha < .01};
+          return {color:hex([0,1,2].map(i => best.reduce((a,c)=>a+c[i],0)/best.length)),dim:shaded.alpha,shade:shaded.color,source:'dom',snapshot:shaded.alpha < .01};
         }
         // Prefer the real CSS canvas to meta theme-color; a site may declare
         // its accent (bright cyan) as theme-color on a nearly black page.
         for (const el of [document.body,document.documentElement]) {
           if (!el) continue;
           const c = rgba(getComputedStyle(el).backgroundColor);
-          if (c && c[3] > .95) return {color:hex(c),dim:shaded.alpha,source:'body',snapshot:false};
+          if (c && c[3] > .95) return {color:hex(c),dim:shaded.alpha,shade:shaded.color,source:'body',snapshot:false};
         }
-        return {color:'',dim:shaded.alpha,source:complex?'gradient':'snapshot',snapshot:!shaded.alpha};
+        return {color:'',dim:shaded.alpha,shade:shaded.color,source:complex?'gradient':'snapshot',snapshot:!shaded.alpha};
       }
       function read() {
         scheduled = false;
