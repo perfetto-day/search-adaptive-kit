@@ -30,6 +30,22 @@ jobs:
       - name: Check Python syntax
         run: python3 -m py_compile apply_mod.py tests/patcher.test.py
 
+  upstream-anchor-smoke:
+    name: Patch Search 1323fdc (reported failure)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch Search at the reported upstream commit
+        run: |
+          git init "$RUNNER_TEMP/Search"
+          git -C "$RUNNER_TEMP/Search" remote add origin https://github.com/driceroland/Search.git
+          git -C "$RUNNER_TEMP/Search" fetch --depth 1 origin 1323fdccb8bb5e941dcdc473d3261fccada13538
+          git -C "$RUNNER_TEMP/Search" checkout --detach FETCH_HEAD
+      - name: Apply and reapply Search Adaptive patch
+        run: |
+          python3 apply_mod.py "$RUNNER_TEMP/Search"
+          python3 apply_mod.py "$RUNNER_TEMP/Search"
+
   macos-build:
     name: macOS / Xcode native build
     runs-on: macos-26

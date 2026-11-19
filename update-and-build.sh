@@ -1,5 +1,5 @@
 #!/bin/bash
-# Search Adaptive v0.6: update only the dedicated checkout, patch, build, install.
+# Search Adaptive v0.8: update only the dedicated checkout, patch, build, install.
 set -euo pipefail
 KIT="$(cd "$(dirname "$0")" && pwd)"
 MODE="${1:-install}"
@@ -54,7 +54,7 @@ git checkout -B adaptive-chrome origin/main
 git reset --hard origin/main
 python3 "$KIT/apply_mod.py" "$SOURCE"
 
-echo "Compiling Search Adaptive v0.6 (log: $ROOT/last-build.log)"
+echo "Compiling Search Adaptive v0.8 (log: $ROOT/last-build.log)"
 if ! ./build.sh release app 2>&1 | tee "$ROOT/last-build.log"; then
   echo "Build failed. Last log: $ROOT/last-build.log" >&2
   echo "Look for the FIRST compiler error, not follow-up messages." >&2

@@ -35,7 +35,9 @@ This is **not** a Chrome / Safari extension. Search's interface is written in Sw
 | **Unified search overlay** | Keeps the last reliable page color; dims tabs/icons on search and matches Peek's 22% page shade |
 | **Modal awareness** | Mirrors the actual RGB tint and alpha of common CSS modal backdrops |
 | **Pixel validation** | Uses limited, occasional WebKit snapshots when CSS sampling is ambiguous |
-| **Seamless rounded page top** | TabBar-hosted top corner cutouts above page compositor, enabled when no actual split is active; debug-on shows pink corners and ROUND DEBUG label |\n| **Release notifications** | Optional official release checks (ON by default), never overwriting the patched app |\n| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
+| **Seamless rounded page top** | TabBar-hosted top corner cutouts above page compositor, enabled when no actual split is active; debug-on shows pink corners and ROUND DEBUG label |
+| **Release notifications** | Optional official release checks (ON by default), never overwriting the patched app |
+| **Repeatable updates** | Reapplies the patch to a clean Search checkout and builds `Search Adaptive.app` |
 
 The color detector is heuristic. Complex canvases, videos, gradients, custom overlays, translucent content and split-screen layouts may not match perfectly.
 
@@ -43,12 +45,12 @@ The color detector is heuristic. Complex canvases, videos, gradients, custom ove
 
 **Requirements:** macOS 14+, full **Xcode** (not just Command Line Tools), Git and Python 3. Node.js is optional for the detector tests.
 
-Clone **this** repository. Until PR #2 is merged, switch to the preview branch:
+Clone **this** repository. For the v0.8 compatibility fix, select its Pull Request branch before building:
 
 ```bash
 git clone https://github.com/perfetto-day/search-adaptive-kit.git
 cd search-adaptive-kit
-git switch feat/v0.7-native-settings-seamless-corners
+git switch feat/v0.8-native-settings-seamless-corners
 ./update-and-build.sh
 ```
 
@@ -76,9 +78,13 @@ Official Search release **checks and in-app announcements are enabled by default
 
 Go to `search://settings/appearance` → **Search Adaptive** for native-styled settings (the same cards, switches and controls as Search itself). The neighboring **Mod updates** group lets you check GitHub versions and stage builds. These are the same preferences as `toggle-mode.command`. Reload already-open pages after enabling color detection.
 
-For **optional GitHub-based mod updates**, click **Check GitHub branches and tags**, select a branch or tag and review its exact commit SHA, then choose **Download & Build**. The build runs locally in a dedicated managed checkout and is **never automatically installed**. After a successful build, confirm **Install & Restart**. A failed build leaves the currently installed app untouched. Selecting a remote revision and building it executes that revision's code on your Mac; only use trusted commits.
+For **optional GitHub-based mod updates**, click **Check GitHub**, select a branch or tag and review its exact commit SHA, then choose **Download & Build**. The build runs locally in a dedicated managed checkout and is **never automatically installed**. After a successful build, confirm **Install & Restart**. A failed build leaves the currently installed app untouched. Selecting a remote revision and building it executes that revision's code on your Mac; only use trusted commits.
 
-The page rounding diagnostic is **pink only while** `debug-on` is active. Disable diagnostics after checking the geometry.\n\n### Controls
+The GitHub checker now reports the **actual HTTP status and GitHub error**, including API rate-limit timing. If the tags endpoint fails, it still displays the available branches. It requests JSON with explicit API/User-Agent headers.
+
+The page rounding diagnostic is **pink only while** `debug-on` is active. Disable diagnostics after checking the geometry.
+
+### Controls
 
 ```bash
 ./toggle-mode.command on          # adaptive UI
@@ -110,7 +116,7 @@ README_RU.md                   Full Russian installation / troubleshooting guide
 CHANGELOG.md                   Changes between prototypes
 ```
 
-The patcher modifies **eight** upstream Swift sources: `Tab.swift`, `App.swift`, `Side.swift`, `TabBar.swift`, `Omnibox.swift`, `Updater.swift`, `Stage.swift`, and `Settings.swift`. It stops rather than guessing when an upstream code anchor changes.
+The patcher modifies **nine** upstream Swift sources: `Tab.swift`, `App.swift`, `Side.swift`, `TabBar.swift`, `Omnibox.swift`, `Updater.swift`, `Stage.swift`, `Settings.swift`, and `Fold.swift`. It recognizes both the original Search UI and the November 2026 `Side.swift` / `TabBar.swift` layout. On unrecognized future changes it still stops safely before modifying files.
 
 ## Tests
 
@@ -124,7 +130,7 @@ The tests cover patch application and JavaScript color heuristics. GitHub Action
 
 ## Project status
 
-**Experimental v0.7** — an independent prototype, not a signed, verified browser release. Expect rough edges. The separate app may use Search's existing application identity and profile settings: back up your browser data before the first run. Do not treat this as an isolated browser security profile.
+**Experimental v0.8** — an independent prototype, not a signed, verified browser release. Expect rough edges. The separate app may use Search's existing application identity and profile settings: back up your browser data before the first run. Do not treat this as an isolated browser security profile.
 
 Contributions and bug reports are welcome, especially reproducible color mismatches and upstream patch conflicts. See [Contributing](CONTRIBUTING.md).
 

@@ -43,6 +43,9 @@ final class AdaptiveModUpdater: ObservableObject {
         let commit: Commit
         struct Commit: Decodable { let sha: String }
     }
+    private struct GitHubAPIError: Decodable {
+        let message: String?
+    }
     @Published private(set) var references: [Reference] = []
     @Published var selectedID = "branch:main"
     @Published private(set) var status = "Choose Check GitHub to list branches and tags."
@@ -77,7 +80,12 @@ final class AdaptiveModUpdater: ObservableObject {
             do {
                 let base = "https://api.github.com/repos/perfetto-day/search-adaptive-kit"
                 let branches: [GitRef] = try await fetch("\(base)/branches?per_page=100")
-                let tags: [GitRef] = try await fetch("\(base)/tags?per_page=100")
+                // Tags are optional. If their endpoint fails, still show the
+                // valid branches instead of dropping the entire result.
+                var tags: [GitRef] = []
+                var tagsWarning: String?
+                do { tags = try await fetch("\(base)/tags?per_page=100") }
+                catch { tagsWarning = error.localizedDescription }
                 let safe = { (name: String) in
                     !name.isEmpty && name.range(of: "^[A-Za-z0-9][A-Za-z0-9._/-]*$", options: .regularExpression) != nil
                         && !name.contains("..") && !name.contains("//") && !name.contains("@{")
@@ -92,6 +100,9 @@ final class AdaptiveModUpdater: ObservableObject {
                     selectedID = references.first?.id ?? "branch:main"
                 }
                 status = references.isEmpty ? "GitHub returned no available refs." : "Found \(references.count) branches and tags. Select an exact revision."
+                if let tagsWarning {
+                    status += " Tags unavailable: \(tagsWarning)"
+                }
             } catch {
                 status = "GitHub check failed: \(error.localizedDescription)"
             }
@@ -101,15 +112,45 @@ final class AdaptiveModUpdater: ObservableObject {
     }
 
     private func fetch<T: Decodable>(_ address: String) async throws -> T {
-        let url = URL(string: address)!
-        var request = URLRequest(url: url)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 15
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw NSError(domain: "SearchAdaptiveGitHub", code: 1, userInfo: [NSLocalizedDescriptionKey: "GitHub API response was not 200"])
+        guard let url = URL(string: address) else {
+            throw NSError(domain: "SearchAdaptiveGitHub", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Invalid GitHub API URL."])
         }
-        return try JSONDecoder().decode(T.self, from: data)
+        // An explicit refresh shouldn't depend on a possibly stale 304 cache
+        // response. GitHub also requires a descriptive User-Agent.
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("SearchAdaptiveKit/\(AdaptiveChrome.kitVersion)", forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw NSError(domain: "SearchAdaptiveGitHub", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "GitHub did not return an HTTP response."])
+        }
+        guard http.statusCode == 200 else {
+            let reason = (try? JSONDecoder().decode(GitHubAPIError.self, from: data))?.message
+            let message: String
+            if http.statusCode == 429 || http.value(forHTTPHeaderField: "X-RateLimit-Remaining") == "0" {
+                if let raw = http.value(forHTTPHeaderField: "X-RateLimit-Reset"),
+                   let reset = Double(raw) {
+                    let minutes = max(1, Int(ceil((reset - Date().timeIntervalSince1970) / 60)))
+                    message = "GitHub API rate limit (HTTP \(http.statusCode)); retry in about \(minutes) min."
+                } else {
+                    message = "GitHub API rate limit (HTTP \(http.statusCode)); retry later."
+                }
+            } else {
+                message = "GitHub API HTTP \(http.statusCode): \(String((reason ?? "request failed").prefix(160)))"
+            }
+            throw NSError(domain: "SearchAdaptiveGitHub", code: http.statusCode,
+                          userInfo: [NSLocalizedDescriptionKey: message])
+        }
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            throw NSError(domain: "SearchAdaptiveGitHub", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "GitHub returned unexpected JSON (HTTP 200): \(error.localizedDescription)"])
+        }
     }
 
     func downloadAndBuild() {

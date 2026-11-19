@@ -183,14 +183,103 @@ final class StageView: NSView {
         settle()
     }
 }
-'''
+''',
+'Fold.swift': '''    private var shownPages: [WKWebView] {
+        guard let active else { return [] }
+        let tabs = activeSplit.map { pair in pair.tabs.compactMap { id in tabs.first { $0.id == id } } } ?? [active]
+        return tabs.compactMap { $0.isWeb && !$0.asleep && !$0.floating ? $0.built : nil }
+    }
+''',
+'Design.swift': '''struct Greys {
+    let wash: Color
+    let hover: Color
+    let tile: Color
+    let pinLive: Color
+}'''
 }
 
 
-def write_fixture(root):
+def updated_upstream_fixture():
+    """Small fixtures reproducing Search's November 2026 UI restructuring.
+
+    The old fixture remains supported for users building older upstream
+    commits; do not copy large copyrighted upstream source files here.
+    """
+    newer = dict(SOURCES)
+    side = newer['Side.swift']
+    side = side.replace(
+        '                landing ? greys.hover : onFrame ? Palette.frame : Palette.ground',
+        '                onFrame ? Palette.frame : Palette.ground\n                if landing { greys.hover }'
+    )
+    side = side.replace(
+        '''    private var colour: Color {
+        if live { return Palette.ink }
+        let colour = hovering ? Palette.ink.opacity(0.7) : Palette.muted
+        return putAway ? colour.opacity(0.45) : colour
+    }''',
+        '''    private var colour: Color {
+        if live || prefs.highContrastText {
+            return putAway ? Palette.ink.opacity(0.45) : Palette.ink
+        }
+        let colour = hovering ? Palette.ink.opacity(0.7) : greys.muted
+        return putAway ? colour.opacity(0.45) : colour
+    }'''
+    )
+    side = side.replace(
+        '.foregroundStyle(hovering ? Palette.ink.opacity(0.7) : Palette.faint)',
+        '.foregroundStyle(hovering ? Palette.ink.opacity(0.7) : greys.faint)'
+    )
+    newer['Side.swift'] = side
+    bar = newer['TabBar.swift']
+    bar = bar.replace(
+        r'    @Environment(\.tabShortcutNumbers) private var shortcutNumbers',
+        r'    @Environment(\.tabShortcutNumbers) private var shortcutNumbers'
+        '\n' r'    @Environment(\.greys) private var greys'
+    )
+    bar = bar.replace(
+        '''    private var ground: some View {
+        Rectangle().fill(pinned ? Palette.pinLive : Palette.wash)
+            .fill(Palette.wash)
+            .fill(Palette.hover)
+            .fill(Palette.wash.opacity(0.55))
+    }''',
+        '''    private var ground: some View {
+        Rectangle().fill(pinned ? greys.pinLive : greys.wash)
+            .fill(greys.wash)
+            .fill(greys.hover)
+            .fill(greys.tile)
+        RoundedRectangle(cornerRadius: 9)
+            .strokeBorder(Palette.ink.opacity(0.35), lineWidth: 1)
+    }'''
+    )
+    bar = bar.replace(
+        '''    private var colour: Color {
+        if live { return Palette.ink }
+        return hovering ? Palette.ink.opacity(0.7) : Palette.muted
+    }''',
+        '''    private var colour: Color {
+        if live || prefs.highContrastText { return Palette.ink }
+        return hovering ? Palette.ink.opacity(0.7) : greys.muted
+    }'''
+    )
+    newer['TabBar.swift'] = bar
+    newer['Design.swift'] = '''struct Greys {
+    let wash: Color
+    let hover: Color
+    let tile: Color
+    let pinLive: Color
+    let washOnTile: Color
+    let hoverOnTile: Color
+    let muted: Color
+    let faint: Color
+}'''
+    return newer
+
+
+def write_fixture(root, fixture=SOURCES):
     src = root/'Sources'/'Search'
     src.mkdir(parents=True)
-    for name,data in SOURCES.items(): (src/name).write_text(data)
+    for name,data in fixture.items(): (src/name).write_text(data)
     return src
 
 
@@ -201,12 +290,15 @@ def check():
         apply(repo,KIT)
         first={p.name:p.read_bytes() for p in src.glob('*.swift')}
         assert 'AdaptiveChromeStyle' in first['Side.swift'].decode()
+        assert 'self.tabs.first' in first['Fold.swift'].decode()
         assert 'actualAdaptive?.searchScrim' in first['Omnibox.swift'].decode()
         assert 'AdaptiveChromeLive.shared' in first['Omnibox.swift'].decode()
         assert 'AdaptiveChromeSearchContext' in first['App.swift'].decode()
         assert 'AdaptiveChromePalette' in first['AdaptiveChrome.swift'].decode()
+        assert 'Greys(wash: active, hover: hover, tile: tile, pinLive: pin)' in first['AdaptiveChrome.swift'].decode()
+        assert 'washOnTile: active' not in first['AdaptiveChrome.swift'].decode()
         assert 'shade: AdaptiveChrome.parse(shade)' in first['Tab.swift'].decode()
-        assert 'Search Adaptive v0.7' in first['Tab.swift'].decode()
+        assert 'Search Adaptive v0.8' in first['Tab.swift'].decode()
         assert 'AdaptiveSettingsPanel(browser: browser)' in first['Settings.swift'].decode()
         assert 'Card { AdaptiveSettingsPanel(browser: browser) }' in first['Settings.swift'].decode()
         assert 'Card { AdaptiveUpdateSettingsPanel() }' in first['Settings.swift'].decode()
@@ -246,6 +338,29 @@ def check():
         apply(repo,KIT)
         second={p.name:p.read_bytes() for p in src.glob('*.swift')}
         assert first==second,'Second application changed the source'
+    # The exact Side/TabBar restructuring that broke builds against
+    # driceroland/Search 1323fdc and later must still apply safely.
+    with TemporaryDirectory() as t:
+        repo=Path(t)/'repo'
+        src=write_fixture(repo, updated_upstream_fixture())
+        apply(repo, KIT)
+        first={p.name:p.read_bytes() for p in src.glob('*.swift')}
+        side=first['Side.swift'].decode()
+        bar=first['TabBar.swift'].decode()
+        assert 'AdaptiveChromeSurface(browser: browser, fallback: onFrame ? Palette.frame : Palette.ground)' in side
+        assert 'if landing { greys.hover }' in side
+        assert 'self.tabs.first' in first['Fold.swift'].decode()
+        assert 'prefs.highContrastText' in side
+        assert 'adaptive?.muted ?? greys.muted' in side
+        assert 'adaptive?.muted ?? greys.faint' in side
+        assert 'Rectangle().fill(pinned ? greys.pinLive : greys.wash)' in bar
+        assert '.strokeBorder((adaptive?.ink ?? Palette.ink).opacity(0.35)' in bar
+        assert 'adaptive?.muted ?? greys.muted' in bar
+        assert 'washOnTile: active, hoverOnTile: hover' in first['AdaptiveChrome.swift'].decode()
+        assert 'faint: muted.opacity(0.62)' in first['AdaptiveChrome.swift'].decode()
+        apply(repo, KIT)
+        assert first=={p.name:p.read_bytes() for p in src.glob('*.swift')}
+
     with TemporaryDirectory() as t:
         repo=Path(t)/'repo'
         src=write_fixture(repo)
@@ -256,6 +371,6 @@ def check():
         else:raise AssertionError('Broken upstream anchor did not fail')
         after={p.name:p.read_bytes() for p in src.glob('*.swift')}
         assert before==after,'Partially wrote sources before failing'
-    print('PASS: idempotent patch, all hooks inserted, fail-closed on upstream drift')
+    print('PASS: legacy and November 2026 upstream, repeatable patch, fail-closed drift handling')
 
 if __name__=='__main__':check()

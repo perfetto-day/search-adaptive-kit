@@ -16,7 +16,7 @@ struct AdaptiveChromeReport: Equatable {
 @MainActor
 enum AdaptiveChrome {
     static let installed = true // Never install a stock Search binary over our app.
-    static let kitVersion = "v0.7"
+    static let kitVersion = "v0.8"
     static let colorTransition: Animation = .easeInOut(duration: 0.24)
     static let settingsKey = "adaptive.chrome.enabled"
     // Notifications about official Search releases are on by default. Never

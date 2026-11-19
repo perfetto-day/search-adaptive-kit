@@ -1,5 +1,15 @@
 # Search Adaptive Kit — Changelog
 
+## v0.8 — Updated Search compatibility and GitHub diagnostics
+
+- Work around an upstream Swift compile error in `Fold.swift` (`tabs` captured before its declaration) by explicitly reading `self.tabs`; no behavioral changes.
+
+- Support the upstream November 2026 `Side.swift` background split while preserving drop-target highlight, SpaceWash, and high-contrast text.
+- Support both the older Palette-based and current environment-Greys-based `TabPill`, retaining hue-aware text and pinned/hover fills.
+- Improve GitHub branch/tag checks with a required User-Agent, explicit API version, meaningful HTTP/rate-limit errors, and graceful branch-only results when tags fail.
+- Add regression tests for both generations of upstream source anchors, plus an upstream smoke check in CI. No changes to working Peek dimming or rounded page corners.
+
+
 ## v0.7 — Native settings & seamless page top corners
 
 - Fixed Peek-mode dimming: the native horizontal tab strip, its icons and buttons now get the same 22% black overlay as Search's page scrim; vertical sidebar controls follow the same dimming.
