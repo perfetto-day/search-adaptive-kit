@@ -116,7 +116,7 @@ README_RU.md                   Full Russian installation / troubleshooting guide
 CHANGELOG.md                   Changes between prototypes
 ```
 
-The patcher modifies **eight** upstream Swift sources: `Tab.swift`, `App.swift`, `Side.swift`, `TabBar.swift`, `Omnibox.swift`, `Updater.swift`, `Stage.swift`, and `Settings.swift`. It recognizes both the original Search UI and the November 2026 `Side.swift` / `TabBar.swift` layout. On unrecognized future changes it still stops safely before modifying files.
+The patcher modifies **nine** upstream Swift sources: `Tab.swift`, `App.swift`, `Side.swift`, `TabBar.swift`, `Omnibox.swift`, `Updater.swift`, `Stage.swift`, `Settings.swift`, and `Fold.swift`. It recognizes both the original Search UI and the November 2026 `Side.swift` / `TabBar.swift` layout. On unrecognized future changes it still stops safely before modifying files.
 
 ## Tests
 

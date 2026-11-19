@@ -184,6 +184,12 @@ final class StageView: NSView {
     }
 }
 ''',
+'Fold.swift': '''    private var shownPages: [WKWebView] {
+        guard let active else { return [] }
+        let tabs = activeSplit.map { pair in pair.tabs.compactMap { id in tabs.first { $0.id == id } } } ?? [active]
+        return tabs.compactMap { $0.isWeb && !$0.asleep && !$0.floating ? $0.built : nil }
+    }
+''',
 'Design.swift': '''struct Greys {
     let wash: Color
     let hover: Color
@@ -284,6 +290,7 @@ def check():
         apply(repo,KIT)
         first={p.name:p.read_bytes() for p in src.glob('*.swift')}
         assert 'AdaptiveChromeStyle' in first['Side.swift'].decode()
+        assert 'self.tabs.first' in first['Fold.swift'].decode()
         assert 'actualAdaptive?.searchScrim' in first['Omnibox.swift'].decode()
         assert 'AdaptiveChromeLive.shared' in first['Omnibox.swift'].decode()
         assert 'AdaptiveChromeSearchContext' in first['App.swift'].decode()
@@ -342,6 +349,7 @@ def check():
         bar=first['TabBar.swift'].decode()
         assert 'AdaptiveChromeSurface(browser: browser, fallback: onFrame ? Palette.frame : Palette.ground)' in side
         assert 'if landing { greys.hover }' in side
+        assert 'self.tabs.first' in first['Fold.swift'].decode()
         assert 'prefs.highContrastText' in side
         assert 'adaptive?.muted ?? greys.muted' in side
         assert 'adaptive?.muted ?? greys.faint' in side

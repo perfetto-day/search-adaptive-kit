@@ -19,7 +19,7 @@ def one(code: str, before: str, after: str, file: Path) -> str:
 
 def apply(repo: Path, kit: Path) -> None:
     root = repo / 'Sources' / 'Search'
-    paths = {n: root / n for n in ['Tab.swift', 'App.swift', 'Side.swift', 'TabBar.swift', 'Omnibox.swift', 'Updater.swift', 'Stage.swift', 'Settings.swift']}
+    paths = {n: root / n for n in ['Tab.swift', 'App.swift', 'Side.swift', 'TabBar.swift', 'Omnibox.swift', 'Updater.swift', 'Stage.swift', 'Settings.swift', 'Fold.swift']}
     for file in paths.values():
         if not file.is_file():
             raise RuntimeError(f"Not a Search source tree: missing {file}")
@@ -524,6 +524,18 @@ struct Omnibox: View {
             '    private func take(_ release: Release) {\n        if AdaptiveChrome.installed { return }', updater)
         changes['Updater.swift'] = s
 
+    # Upstream Search 1323fdc (and later) uses a local 'tabs' inside its own
+    # initialization closure. Swift rejects this as capture-before-declaration.
+    # Refer explicitly to Browser.tabs to preserve the intended lookup.
+    fold = paths['Fold.swift']
+    s = changes['Fold.swift']
+    shadowed_tabs = 'let tabs = activeSplit.map { pair in pair.tabs.compactMap { id in tabs.first { $0.id == id } } } ?? [active]'
+    explicit_tabs = 'let tabs = activeSplit.map { pair in pair.tabs.compactMap { id in self.tabs.first { $0.id == id } } } ?? [active]'
+    if shadowed_tabs in s:
+        s = one(s, shadowed_tabs, explicit_tabs, fold)
+        changes['Fold.swift'] = s
+    # An upstream fix using 'self.tabs' already needs no modification.
+
     modules = ['AdaptiveChrome.swift', 'AdaptiveSettings.swift']
     for module in modules:
         if not (kit / module).is_file():
@@ -560,7 +572,7 @@ struct Omnibox: View {
         target = root / name
         if not target.is_file() or target.read_text(encoding='utf8') != content:
             target.write_text(content, encoding='utf8')
-    print('Applied Search Adaptive Chrome v0.8 (8 integration files + 2 modules).')
+    print('Applied Search Adaptive Chrome v0.8 (9 integration files + 2 modules).')
     print('Enable before launch: defaults write com.officecommun.search adaptive.chrome.enabled -bool true')
 
 
