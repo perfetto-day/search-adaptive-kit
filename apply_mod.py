@@ -7,7 +7,6 @@ patched on top of a previous, possibly incompatible, patched source tree.
 """
 from pathlib import Path
 import argparse
-import shutil
 import sys
 
 
@@ -25,6 +24,10 @@ def apply(repo: Path, kit: Path) -> None:
         if not file.is_file():
             raise RuntimeError(f"Not a Search source tree: missing {file}")
     changes = {n: p.read_text(encoding='utf8') for n, p in paths.items()}
+    design_path = root / 'Design.swift'
+    if not design_path.is_file():
+        raise RuntimeError(f"Not a Search source tree: missing {design_path}")
+    design = design_path.read_text(encoding='utf8')
 
     tab = paths['Tab.swift']; s = changes['Tab.swift']
     if 'private let adaptiveChromeRelay' not in s:
@@ -525,13 +528,38 @@ struct Omnibox: View {
     for module in modules:
         if not (kit / module).is_file():
             raise RuntimeError(f"Missing {kit / module}")
-    # All anchors passed, now write changes atomically per file.
+    module_sources = {n: (kit / n).read_text(encoding='utf8') for n in modules}
+
+    # Search changed Greys from a four-color palette to eight colors in
+    # November 2026. Adapt the *copied module*, not Search's Design.swift.
+    # This keeps the patch compatible with older and newer upstream commits.
+    if ('let washOnTile: Color' in design and
+            'let hoverOnTile: Color' in design and
+            'let muted: Color' in design and 'let faint: Color' in design):
+        module_sources['AdaptiveChrome.swift'] = one(
+            module_sources['AdaptiveChrome.swift'],
+            '    var greys: Greys { Greys(wash: active, hover: hover, tile: tile, pinLive: pin) }',
+            '''    var greys: Greys {
+        Greys(wash: active, hover: hover, tile: tile, pinLive: pin,
+              washOnTile: active, hoverOnTile: hover, muted: muted,
+              faint: muted.opacity(0.62))
+    }''', design_path)
+    elif 'struct Greys' in design and 'let wash: Color' in design and 'let pinLive: Color' in design:
+        # Original four-color Greys initializer.
+        pass
+    else:
+        raise RuntimeError('Design.swift: unknown Greys palette signature')
+
+    # All anchors and upstream palette signatures passed. Write only changed
+    # files, so a repeated patch is deterministic and doesn't reset mtimes.
     for name, content in changes.items():
         path = paths[name]
         if path.read_text(encoding='utf8') != content:
             path.write_text(content, encoding='utf8')
-    for module in modules:
-        shutil.copy2(kit / module, root / module)
+    for name, content in module_sources.items():
+        target = root / name
+        if not target.is_file() or target.read_text(encoding='utf8') != content:
+            target.write_text(content, encoding='utf8')
     print('Applied Search Adaptive Chrome v0.8 (8 integration files + 2 modules).')
     print('Enable before launch: defaults write com.officecommun.search adaptive.chrome.enabled -bool true')
 

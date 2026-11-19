@@ -183,7 +183,13 @@ final class StageView: NSView {
         settle()
     }
 }
-'''
+''',
+'Design.swift': '''struct Greys {
+    let wash: Color
+    let hover: Color
+    let tile: Color
+    let pinLive: Color
+}'''
 }
 
 
@@ -251,6 +257,16 @@ def updated_upstream_fixture():
     }'''
     )
     newer['TabBar.swift'] = bar
+    newer['Design.swift'] = '''struct Greys {
+    let wash: Color
+    let hover: Color
+    let tile: Color
+    let pinLive: Color
+    let washOnTile: Color
+    let hoverOnTile: Color
+    let muted: Color
+    let faint: Color
+}'''
     return newer
 
 
@@ -272,6 +288,8 @@ def check():
         assert 'AdaptiveChromeLive.shared' in first['Omnibox.swift'].decode()
         assert 'AdaptiveChromeSearchContext' in first['App.swift'].decode()
         assert 'AdaptiveChromePalette' in first['AdaptiveChrome.swift'].decode()
+        assert 'Greys(wash: active, hover: hover, tile: tile, pinLive: pin)' in first['AdaptiveChrome.swift'].decode()
+        assert 'washOnTile: active' not in first['AdaptiveChrome.swift'].decode()
         assert 'shade: AdaptiveChrome.parse(shade)' in first['Tab.swift'].decode()
         assert 'Search Adaptive v0.8' in first['Tab.swift'].decode()
         assert 'AdaptiveSettingsPanel(browser: browser)' in first['Settings.swift'].decode()
@@ -330,6 +348,8 @@ def check():
         assert 'Rectangle().fill(pinned ? greys.pinLive : greys.wash)' in bar
         assert '.strokeBorder((adaptive?.ink ?? Palette.ink).opacity(0.35)' in bar
         assert 'adaptive?.muted ?? greys.muted' in bar
+        assert 'washOnTile: active, hoverOnTile: hover' in first['AdaptiveChrome.swift'].decode()
+        assert 'faint: muted.opacity(0.62)' in first['AdaptiveChrome.swift'].decode()
         apply(repo, KIT)
         assert first=={p.name:p.read_bytes() for p in src.glob('*.swift')}
 
