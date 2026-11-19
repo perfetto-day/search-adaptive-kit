@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Search Adaptive v0.7 overlay. Validates all anchors before touching files.
+"""Search Adaptive v0.8 overlay. Validates all anchors before touching files.
 
 Works against a clean upstream checkout; safe to run twice on the same checkout.
 The update script always restores upstream main first so a new release is never
@@ -32,7 +32,7 @@ def apply(repo: Path, kit: Path) -> None:
             '    @Published private(set) var cover: NSImage?',
             '''    @Published private(set) var cover: NSImage?
 
-    // Search Adaptive v0.7. Only the active Tab's report is drawn in the chrome.
+    // Search Adaptive v0.8. Only the active Tab's report is drawn in the chrome.
     @Published private(set) var adaptiveChromeReport = AdaptiveChromeReport()
     private let adaptiveChromeRelay = AdaptiveChromeRelay()
     private var adaptiveChromeGeneration = 0
@@ -257,10 +257,21 @@ def apply(repo: Path, kit: Path) -> None:
             '        .environment(\\.greys, greys)\n        .frame(width: width)',
             '''        .modifier(AdaptiveChromeStyle(browser: browser, greys: greys))
         .frame(width: width)''', side)
-        s = one(s,
-            '                landing ? greys.hover : onFrame ? Palette.frame : Palette.ground',
-            '''                if landing { greys.hover }
+        # Search 2026-11 split the resting background and drop hover into
+        # distinct ZStack layers. Preserve their order (especially SpaceWash).
+        old_ground = '                landing ? greys.hover : onFrame ? Palette.frame : Palette.ground'
+        split_ground = '''                onFrame ? Palette.frame : Palette.ground
+                if landing { greys.hover }'''
+        if old_ground in s:
+            s = one(s, old_ground,
+                '''                if landing { greys.hover }
                 else { AdaptiveChromeSurface(browser: browser, fallback: onFrame ? Palette.frame : Palette.ground) }''', side)
+        elif split_ground in s:
+            s = one(s, split_ground,
+                '''                AdaptiveChromeSurface(browser: browser, fallback: onFrame ? Palette.frame : Palette.ground)
+                if landing { greys.hover }''', side)
+        else:
+            raise RuntimeError('Side.swift: unknown sidebar ground / landing structure')
         s = one(s,
             'if !onFrame { Rectangle().fill(Palette.hairline).frame(width: 1) }',
             'if !onFrame && !AdaptiveChrome.enabled { Rectangle().fill(Palette.hairline).frame(width: 1) }', side)
@@ -271,17 +282,37 @@ def apply(repo: Path, kit: Path) -> None:
             '''private struct SideRow: View, Equatable {
     @Environment(\\.adaptiveChromePalette) private var adaptive
     @Environment(\\.greys) private var greys''', side)
-        s = one(s,
-            '''    private var colour: Color {
+        old_row = '''    private var colour: Color {
         if live { return Palette.ink }
         let colour = hovering ? Palette.ink.opacity(0.7) : Palette.muted
         return putAway ? colour.opacity(0.45) : colour
-    }''',
-            '''    private var colour: Color {
+    }'''
+        current_row = '''    private var colour: Color {
+        if live || prefs.highContrastText {
+            return putAway ? Palette.ink.opacity(0.45) : Palette.ink
+        }
+        let colour = hovering ? Palette.ink.opacity(0.7) : greys.muted
+        return putAway ? colour.opacity(0.45) : colour
+    }'''
+        if old_row in s:
+            s = one(s, old_row,
+                '''    private var colour: Color {
         if live { return adaptive?.ink ?? Palette.ink }
         let colour = hovering ? (adaptive?.ink ?? Palette.ink).opacity(0.7) : (adaptive?.muted ?? Palette.muted)
         return putAway ? colour.opacity(0.45) : colour
     }''', side)
+        elif current_row in s:
+            s = one(s, current_row,
+                '''    private var colour: Color {
+        let ink = adaptive?.ink ?? Palette.ink
+        if live || prefs.highContrastText {
+            return putAway ? ink.opacity(0.45) : ink
+        }
+        let colour = hovering ? ink.opacity(0.7) : (adaptive?.muted ?? greys.muted)
+        return putAway ? colour.opacity(0.45) : colour
+    }''', side)
+        else:
+            raise RuntimeError('Side.swift: unknown SideRow colour structure')
         # Shared toolbar Door (back/forward/reload, bookmarks) also needs
         # proper contrast. It appears in both the horizontal and side layouts.
         s = one(s,
@@ -294,9 +325,17 @@ def apply(repo: Path, kit: Path) -> None:
         s = one(s,
             'struct Quiet: View {\n    @Environment(\\.greys) private var greys',
             'struct Quiet: View {\n    @Environment(\\.adaptiveChromePalette) private var adaptive\n    @Environment(\\.greys) private var greys', side)
-        s = one(s,
-            '            .foregroundStyle(hovering ? Palette.ink.opacity(0.7) : Palette.faint)',
-            '            .foregroundStyle(hovering ? (adaptive?.ink ?? Palette.ink).opacity(0.7) : (adaptive?.muted ?? Palette.faint))', side)
+        # Newer Search derives its faint ink from the current Greys scheme.
+        old_quiet = '            .foregroundStyle(hovering ? Palette.ink.opacity(0.7) : Palette.faint)'
+        current_quiet = '            .foregroundStyle(hovering ? Palette.ink.opacity(0.7) : greys.faint)'
+        if old_quiet in s:
+            s = one(s, old_quiet,
+                '            .foregroundStyle(hovering ? (adaptive?.ink ?? Palette.ink).opacity(0.7) : (adaptive?.muted ?? Palette.faint))', side)
+        elif current_quiet in s:
+            s = one(s, current_quiet,
+                '            .foregroundStyle(hovering ? (adaptive?.ink ?? Palette.ink).opacity(0.7) : (adaptive?.muted ?? greys.faint))', side)
+        else:
+            raise RuntimeError('Side.swift: unknown Quiet text colour structure')
         changes['Side.swift'] = s
 
     bar = paths['TabBar.swift']; s = changes['TabBar.swift']
@@ -324,21 +363,42 @@ def apply(repo: Path, kit: Path) -> None:
         start = s.index('private struct TabPill: View, Equatable {')
         end = s.index('/// The address, inside its own tab.', start)
         pill = s[start:end]
-        expected = {
-            'Rectangle().fill(pinned ? Palette.pinLive : Palette.wash)': 'Rectangle().fill(pinned ? (adaptive?.pin ?? Palette.pinLive) : (adaptive?.active ?? Palette.wash))',
-            '.fill(Palette.wash)': '.fill(adaptive?.active ?? Palette.wash)',
-            '.fill(Palette.hover)': '.fill(adaptive?.hover ?? Palette.hover)',
-            '.fill(Palette.wash.opacity(0.55))': '.fill(adaptive?.tile ?? Palette.wash.opacity(0.55))',
-            '''    private var colour: Color {
+        if 'Rectangle().fill(pinned ? greys.pinLive : greys.wash)' in pill:
+            # Current Search uses @Environment(\.greys) for pill backgrounds.
+            # AdaptiveChromeStyle already provides a tinted Greys instance;
+            # don't replace these fills with different colors or break reading
+            # progress / high contrast settings.
+            pill = one(pill,
+                '''    private var colour: Color {
+        if live || prefs.highContrastText { return Palette.ink }
+        return hovering ? Palette.ink.opacity(0.7) : greys.muted
+    }''',
+                '''    private var colour: Color {
+        let ink = adaptive?.ink ?? Palette.ink
+        if live || prefs.highContrastText { return ink }
+        return hovering ? ink.opacity(0.7) : (adaptive?.muted ?? greys.muted)
+    }''', bar)
+            pill = one(pill,
+                '.strokeBorder(Palette.ink.opacity(0.35), lineWidth: 1)',
+                '.strokeBorder((adaptive?.ink ?? Palette.ink).opacity(0.35), lineWidth: 1)', bar)
+        elif 'Rectangle().fill(pinned ? Palette.pinLive : Palette.wash)' in pill:
+            expected = {
+                'Rectangle().fill(pinned ? Palette.pinLive : Palette.wash)': 'Rectangle().fill(pinned ? (adaptive?.pin ?? Palette.pinLive) : (adaptive?.active ?? Palette.wash))',
+                '.fill(Palette.wash)': '.fill(adaptive?.active ?? Palette.wash)',
+                '.fill(Palette.hover)': '.fill(adaptive?.hover ?? Palette.hover)',
+                '.fill(Palette.wash.opacity(0.55))': '.fill(adaptive?.tile ?? Palette.wash.opacity(0.55))',
+                '''    private var colour: Color {
         if live { return Palette.ink }
         return hovering ? Palette.ink.opacity(0.7) : Palette.muted
     }''': '''    private var colour: Color {
         if live { return adaptive?.ink ?? Palette.ink }
         return hovering ? (adaptive?.ink ?? Palette.ink).opacity(0.7) : (adaptive?.muted ?? Palette.muted)
     }'''
-        }
-        for before, after in expected.items():
-            pill = one(pill, before, after, bar)
+            }
+            for before, after in expected.items():
+                pill = one(pill, before, after, bar)
+        else:
+            raise RuntimeError('TabBar.swift: unknown TabPill ground structure')
         s = s[:start] + pill + s[end:]
         changes['TabBar.swift'] = s
 
@@ -472,7 +532,7 @@ struct Omnibox: View {
             path.write_text(content, encoding='utf8')
     for module in modules:
         shutil.copy2(kit / module, root / module)
-    print('Applied Search Adaptive Chrome v0.7 (8 integration files + 2 modules).')
+    print('Applied Search Adaptive Chrome v0.8 (8 integration files + 2 modules).')
     print('Enable before launch: defaults write com.officecommun.search adaptive.chrome.enabled -bool true')
 
 

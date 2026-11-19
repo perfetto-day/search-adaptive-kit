@@ -1,5 +1,5 @@
 #!/bin/bash
-# Search Adaptive v0.6: explicit pin-to-SHA update builder / staged installer.
+# Search Adaptive v0.8: explicit pin-to-SHA update builder / staged installer.
 # This script is copied into ~/Library/Application Support/SearchAdaptive/Tools
 # by the initial trusted install. No automatic remote scripts are launched.
 set -euo pipefail
